@@ -20,10 +20,20 @@ function escapeHtml(value) {
 
 // ── Reference data ───────────────────────────────────────────────────
 const profiles = {
-  jde: { badge: "JDE", name: "JDE / classic work orders", order: "Work order", route: "Routing", resource: "Work center" },
-  sap_pp: { badge: "SAP PP", name: "SAP ECC PP", order: "Production order", route: "Routing", resource: "Work center" },
-  sap_pi: { badge: "SAP PP-PI", name: "SAP ECC PP-PI", order: "Process order", route: "Master recipe", resource: "Resource" },
-  s4: { badge: "S/4HANA", name: "S/4HANA target state", order: "Manufacturing order", route: "Routing or recipe", resource: "Work center" },
+  jde: { badge: "JDE", name: "JDE / classic work orders", order: "Work order", route: "Routing", facility: "Branch / Plant", storage: "Location", bin: "Lot / Location", area: "Department", resource: "Work center", hierarchy: ["Company", "Branch / Plant", "Location"] },
+  sap_pp: { badge: "SAP PP", name: "SAP ECC PP", order: "Production order", route: "Routing", facility: "Plant", storage: "Storage Location", bin: "Storage Bin", area: "Production Supply Area", resource: "Work Center", hierarchy: ["Client", "Company Code", "Plant", "Storage Location", "Storage Bin"] },
+  sap_pi: { badge: "SAP PP-PI", name: "SAP ECC PP-PI", order: "Process order", route: "Master recipe", facility: "Plant", storage: "Storage Location", bin: "Storage Bin", area: "Production Supply Area", resource: "Resource", hierarchy: ["Client", "Company Code", "Plant", "Storage Location", "Storage Bin"] },
+  s4: { badge: "S/4HANA", name: "S/4HANA", order: "Manufacturing order", route: "Routing or recipe", facility: "Plant", storage: "Storage Location", bin: "Storage Bin", area: "Production Supply Area", resource: "Work Center / Resource", hierarchy: ["Client", "Company Code", "Plant", "Storage Location", "Storage Bin"] },
+  oracle: { badge: "Oracle SCM", name: "Oracle Fusion Cloud SCM", order: "Work order", route: "Work definition", facility: "Inventory / Manufacturing Organization", storage: "Subinventory", bin: "Locator", area: "Work Area", resource: "Work Center / Resource", hierarchy: ["Legal Entity / Business Unit", "Inventory Organization", "Subinventory", "Locator"] },
+  d365: { badge: "D365 SCM", name: "Microsoft Dynamics 365 SCM", order: "Production order", route: "Route", facility: "Site", storage: "Warehouse", bin: "Location", area: "Production Unit", resource: "Resource / Resource Group", hierarchy: ["Legal Entity", "Site", "Warehouse", "Location"] },
+  infor_ln: { badge: "Infor LN", name: "Infor LN", order: "Production order", route: "Routing", facility: "Site", storage: "Warehouse", bin: "Location", area: "Department", resource: "Work Center", hierarchy: ["Company", "Enterprise Unit / Site", "Warehouse / Department", "Location"] },
+  netsuite: { badge: "NetSuite", name: "Oracle NetSuite", order: "Work order", route: "Manufacturing routing", facility: "Location", storage: "Location", bin: "Bin", area: "Production Area", resource: "Work Center", hierarchy: ["Subsidiary", "Location", "Bin"] },
+  odoo: { badge: "Odoo", name: "Odoo Manufacturing", order: "Manufacturing order", route: "BoM / Operations", facility: "Warehouse", storage: "Location", bin: "Location", area: "Production Area", resource: "Work Center", hierarchy: ["Company", "Warehouse", "Location"] },
+  peoplesoft: { badge: "PeopleSoft", name: "PeopleSoft Manufacturing", order: "Production ID", route: "Routing", facility: "Manufacturing Business Unit", storage: "Storage Location", bin: "Storage Location", area: "Production Area", resource: "Work Center", hierarchy: ["SetID / Business Unit", "Manufacturing Business Unit", "Storage Location"] },
+  qad: { badge: "QAD", name: "QAD", order: "Work order", route: "Routing", facility: "Site", storage: "Warehouse", bin: "Location", area: "Department", resource: "Work Center", hierarchy: ["Domain", "Site", "Warehouse", "Location"] },
+  plex: { badge: "Plex", name: "Plex Smart Manufacturing", order: "Job", route: "Routing", facility: "Plant", storage: "Location", bin: "Location", area: "Cell", resource: "Work Center / Cell", hierarchy: ["Enterprise", "Plant", "Location", "Work Center / Cell"] },
+  epicor: { badge: "Epicor", name: "Epicor Kinetic", order: "Job", route: "Method of manufacture", facility: "Plant", storage: "Warehouse", bin: "Bin", area: "Department", resource: "Resource Group / Resource", hierarchy: ["Company", "Site / Plant", "Warehouse", "Bin"] },
+  ifs: { badge: "IFS", name: "IFS Cloud", order: "Shop order", route: "Routing", facility: "Site", storage: "Warehouse", bin: "Location", area: "Production Line", resource: "Work Center", hierarchy: ["Company", "Site", "Warehouse", "Location"] },
 };
 
 // The archetype's manufacturing MODE — not the industry — predicts the
@@ -171,17 +181,21 @@ const steps = [
         <label class="field big-field">
           <span>ERP dialect</span>
           <select id="erpSelect">
-            <option value="jde">JDE / classic work orders</option>
-            <option value="sap_pp">SAP ECC PP</option>
-            <option value="sap_pi">SAP ECC PP-PI</option>
-            <option value="s4">S/4HANA target state</option>
+            ${Object.entries(profiles).map(([id, item]) => `<option value="${escapeHtml(id)}">${escapeHtml(item.name)}</option>`).join("")}
           </select>
         </label>
+        <div class="derive-chain hierarchy-chain" aria-label="ERP organization hierarchy">
+          ${profile().hierarchy.map((term, index) => `${index ? '<i data-lucide="arrow-right"></i>' : ""}<span class="chain-node">${escapeHtml(term)}</span>`).join("")}
+        </div>
         <div class="vocab-line">
           <span>You'll plan</span>
           <strong>${escapeHtml(profile().order)}s</strong>
           <em>against</em>
           <strong>${escapeHtml(profile().route)}s</strong>
+          <em>at</em>
+          <strong>${escapeHtml(profile().facility)}</strong>
+          <em>using</em>
+          <strong>${escapeHtml(profile().resource)}s</strong>
         </div>
       </div>
     `,
@@ -206,15 +220,15 @@ const steps = [
     attach: (root) => bindChoices(root, (v) => { state.migration = v === "yes"; render(); }),
   },
   {
-    id: "site", phase: "Plant", nav: "Plant name",
-    title: "Name the plant.",
-    sub: "This becomes the root of the model — every area, resource, and decision hangs off it.",
-    hint: "Enter a plant name to continue.",
+    id: "site", phase: "Facility", nav: "Facility name",
+    title: () => `Name the ${profile().facility.toLowerCase()}.`,
+    sub: () => `In ${profile().badge}, this is the ${profile().facility}. Every ${profile().area.toLowerCase()}, ${profile().resource.toLowerCase()}, storage object, and decision hangs off it.`,
+    hint: "Enter the facility name to continue.",
     gate: () => siteName().trim().length > 0,
     body: () => `
       <label class="field big-field solo">
-        <span>Plant name</span>
-        <input id="siteInput" type="text" value="${escapeHtml(siteName())}" placeholder="e.g. Milano Packaging Plant" autocomplete="off" />
+        <span>${escapeHtml(profile().facility)} name</span>
+        <input id="siteInput" type="text" value="${escapeHtml(siteName())}" placeholder="e.g. Milano Packaging" autocomplete="off" />
       </label>
     `,
     attach: (root) => {
@@ -227,7 +241,7 @@ const steps = [
     },
   },
   {
-    id: "schedule", phase: "Plant", nav: "Schedule mode",
+    id: "schedule", phase: "Facility", nav: "Schedule mode",
     title: "How should the pilot schedule?",
     sub: "One choice now keeps the model honest. You can refine it later.",
     hint: "Pick a scheduling mode to continue.",
@@ -242,7 +256,7 @@ const steps = [
     attach: (root) => bindChoices(root, (v) => { state.planningMode = v; render(); }),
   },
   {
-    id: "constraint", phase: "Plant", nav: "Constraint view",
+    id: "constraint", phase: "Facility", nav: "Constraint view",
     title: "What is currently known about the constraint?",
     sub: "Capture the customer's view as a hypothesis, not as planning truth. The limiting constraint may be unknown or shift by horizon, product mix, campaign, and scenario.",
     hint: "Choose the best current description. It can be refined when data and scenarios reveal more.",
@@ -261,7 +275,7 @@ const steps = [
   {
     id: "areas", phase: "Model", nav: "Areas",
     title: "Confirm the operating areas.",
-    sub: "These came from the template. Add anything the plant has that's missing.",
+    sub: () => `These came from the template. Add any ${profile().area.toLowerCase()} or operating area the ${profile().facility.toLowerCase()} is missing.`,
     gate: () => areas().length > 0,
     body: () => `
       <div class="tile-list">
@@ -286,14 +300,14 @@ const steps = [
         const name = root.querySelector("#areaInput").value.trim();
         if (!name) return;
         const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `area-${Date.now()}`;
-        Model.add({ id, type: "area", props: { name, color: "teal" } }, `${name} added to the site model.`);
+        Model.add({ id, type: "area", props: { name, color: "teal" } }, `${name} added to the ${profile().facility.toLowerCase()} model.`);
         render();
       });
     },
   },
   {
-    id: "workcenters", phase: "Model", nav: "Work centers",
-    title: "Place each work center — and settle the data issue.",
+    id: "workcenters", phase: "Model", nav: "Resources",
+    title: () => `Place each ${profile().resource.toLowerCase()} — and settle the data issue.`,
     sub: "One resource came in with a missing calendar. Decide how the pilot handles it before moving on.",
     hint: "Resolve Packaging Line 3 to continue.",
     gate: () => !!state.lineDecision,
@@ -445,9 +459,9 @@ const steps = [
     body: () => {
       const r = readiness();
       const rows = [
-        ["Plant model", siteName() ? "done" : "open", siteName() ? `${siteName()} · ${areas().length} areas` : "Not named"],
+        [`${profile().facility} model`, siteName() ? "done" : "open", siteName() ? `${siteName()} · ${areas().length} areas` : "Not named"],
         ["Scheduling", state.planningMode ? "done" : "open", state.planningMode || "Not chosen"],
-        ["Work centers", state.lineDecision ? "done" : "open", state.lineDecision === "flag" ? "Line 3 flagged for cleanup" : state.lineDecision === "exclude" ? "Line 3 excluded" : "Unresolved"],
+        [`${profile().resource} model`, state.lineDecision ? "done" : "open", state.lineDecision === "flag" ? "Line 3 flagged for cleanup" : state.lineDecision === "exclude" ? "Line 3 excluded" : "Unresolved"],
         ["Demo evidence", state.demo ? "done" : "open", state.demo ? `${state.demo.score}% training score` : "Pending"],
         ["Migration risk", "info", state.migration ? "S/4 migration on roadmap" : "No migration planned"],
       ];
@@ -619,6 +633,16 @@ function exportBrief() {
     archetype: archetype()?.name,
     mode: mode().label,
     dialect: profile().badge,
+    terminology: {
+      facility: profile().facility,
+      storage: profile().storage,
+      bin: profile().bin,
+      area: profile().area,
+      resource: profile().resource,
+      order: profile().order,
+      route: profile().route,
+      hierarchy: profile().hierarchy,
+    },
     site: siteName(),
     areas: areas().map((a) => a.name),
     workcenters: workcenters().map((w) => ({ name: w.name, area: areaName(w.areaId) })),
