@@ -4,21 +4,21 @@
 
 | Purpose | Folder | Branch |
 | --- | --- | --- |
-| Integration | `Digital Transformation Configurator` | `main` |
-| Codex work | `DTC-codex` | `codex` |
-| Claude work | `DTC-claude` | `claude` |
+| Integration | `Digital Transformation Configurator/main` | `main` |
+| Codex work | `Digital Transformation Configurator/codex` | `codex` |
+| Claude work | `Digital Transformation Configurator/claude` | `claude` |
 
 Do not ask both agents to edit the integration folder. Give each agent its own worktree folder.
 
 ## Daily workflow
 
-1. Give Codex tasks in `DTC-codex`.
-2. Give Claude tasks in `DTC-claude`.
+1. Give Codex tasks in `Digital Transformation Configurator/codex`.
+2. Give Claude tasks in `Digital Transformation Configurator/claude`.
 3. Ask each agent to commit completed tasks with a focused commit message.
 4. Merge finished work into `main` from the integration folder.
 
 ```powershell
-cd "C:\Users\pedro\OneDrive\Documentos\Digital Transformation Configurator"
+cd "C:\Users\pedro\OneDrive\Documentos\Digital Transformation Configurator\main"
 git merge codex
 git merge claude
 ```
@@ -35,8 +35,8 @@ git commit
 After changes are merged into `main`, update both agent folders before starting new work:
 
 ```powershell
-git -C "C:\Users\pedro\OneDrive\Documentos\DTC-codex" merge main
-git -C "C:\Users\pedro\OneDrive\Documentos\DTC-claude" merge main
+git -C "C:\Users\pedro\OneDrive\Documentos\Digital Transformation Configurator\codex" merge main
+git -C "C:\Users\pedro\OneDrive\Documentos\Digital Transformation Configurator\claude" merge main
 ```
 
 ## Preview ports
