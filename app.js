@@ -76,6 +76,13 @@ const initialState = {
   planningMode: null,
   constraint: null,
   lineDecision: null,
+  bom: {
+    structure: null,
+    features: [],
+    featuresConfirmed: false,
+    consumption: null,
+    source: null,
+  },
   variant: null, // null | "active" | "kept" | "reverted" | "skipped"
   demo: null, // { laneId, score, note }
   done: false,
@@ -110,6 +117,7 @@ function readiness() {
   if (state.planningMode) s += 8;
   if (state.constraint) s += 6;
   if (state.lineDecision) s += 10;
+  if (state.bom?.structure && state.bom?.featuresConfirmed && state.bom?.consumption && state.bom?.source) s += 8;
   if (state.variant && state.variant !== "active") s += 6;
   if (state.demo) s += Math.round(state.demo.score * 0.24);
   if (state.migration) s -= 4;
@@ -349,6 +357,76 @@ const steps = [
     },
   },
   {
+    id: "bom", phase: "Model", nav: "BOM profile",
+    title: "How does the product structure reach planning?",
+    sub: () => `Characterize the ${profile().route.toLowerCase()} and component model across four independent dimensions. APS should preserve what matters without assuming every ERP sends a clean master BOM.`,
+    hint: "Complete all four BOM dimensions to continue.",
+    gate: () => !!(state.bom?.structure && state.bom?.featuresConfirmed && state.bom?.consumption && state.bom?.source),
+    body: () => {
+      const bom = state.bom || initialState.bom;
+      const feature = (value, icon, title, sub) => choiceTile(value, bom.features.includes(value), icon, title, sub).replace("data-choice", "data-bom-feature");
+      return `
+        <div class="bom-profile">
+          <section class="bom-dimension">
+            <div class="dimension-heading"><span>01</span><div><strong>Structure</strong><small>How components are represented</small></div></div>
+            <div class="choice-grid three compact" data-bom-group="structure">
+              ${choiceTile("multi-level", bom.structure === "multi-level", "network", "Multi-level", "Preserve assemblies and lower-level dependencies")}
+              ${choiceTile("single-level", bom.structure === "single-level", "list-tree", "Collapsed single level", "Planning receives an exploded component list")}
+              ${choiceTile("recipe-formula", bom.structure === "recipe-formula", "flask-conical", "Recipe / formula", "Ingredients, quantities, phases, or process instructions")}
+            </div>
+          </section>
+          <section class="bom-dimension">
+            <div class="dimension-heading"><span>02</span><div><strong>Special behavior</strong><small>Select all that occur</small></div></div>
+            <div class="choice-grid compact bom-features">
+              ${feature("phantoms", "combine", "Phantom assemblies", "Logical groupings exploded without their own order")}
+              ${feature("recursion", "repeat-2", "Recursion / loops", "Rework, co-products, or structures that revisit themselves")}
+              ${feature("potency", "test-tube-2", "Lot potency / assay", "Required quantity varies by lot strength or concentration")}
+              ${choiceTile("none", bom.featuresConfirmed && bom.features.length === 0, "circle-slash-2", "None identified", "Explicitly confirm no special behavior").replace("data-choice", "data-bom-feature-none")}
+            </div>
+          </section>
+          <section class="bom-dimension">
+            <div class="dimension-heading"><span>03</span><div><strong>Consumption linkage</strong><small>Where demand is attached</small></div></div>
+            <div class="choice-grid three compact" data-bom-group="consumption">
+              ${choiceTile("operation", bom.consumption === "operation", "git-commit-horizontal", "Operation-linked", "Each component points to a consuming operation or phase")}
+              ${choiceTile("order", bom.consumption === "order", "package", "Order-level", "Components are consumed without an operation assignment")}
+              ${choiceTile("mixed", bom.consumption === "mixed", "split", "Mixed", "Operation-linked and order-level consumption coexist")}
+            </div>
+          </section>
+          <section class="bom-dimension">
+            <div class="dimension-heading"><span>04</span><div><strong>Integration grain</strong><small>What the ERP actually sends</small></div></div>
+            <div class="choice-grid three compact" data-bom-group="source">
+              ${choiceTile("master", bom.source === "master", "library", "Master BOM / recipe", "Versioned product structure from master data")}
+              ${choiceTile("order-specific", bom.source === "order-specific", "clipboard-list", "Order BOM", "Copied or changed structure attached to the order")}
+              ${choiceTile("allocation", bom.source === "allocation", "boxes", "Allocation / reservation", "Actual reserved materials, batches, or supply assignments")}
+              ${choiceTile("hybrid", bom.source === "hybrid", "layers-3", "Hybrid", "Master structure plus order and reservation deltas")}
+            </div>
+          </section>
+        </div>
+      `;
+    },
+    attach: (root) => {
+      root.querySelectorAll("[data-bom-group]").forEach((group) => {
+        group.querySelectorAll("[data-choice]").forEach((button) => button.addEventListener("click", () => {
+          state.bom[group.dataset.bomGroup] = button.dataset.choice;
+          render();
+        }));
+      });
+      root.querySelectorAll("[data-bom-feature]").forEach((button) => button.addEventListener("click", () => {
+        const value = button.dataset.bomFeature;
+        const selected = new Set(state.bom.features);
+        selected.has(value) ? selected.delete(value) : selected.add(value);
+        state.bom.features = [...selected];
+        state.bom.featuresConfirmed = true;
+        render();
+      }));
+      root.querySelector("[data-bom-feature-none]")?.addEventListener("click", () => {
+        state.bom.features = [];
+        state.bom.featuresConfirmed = true;
+        render();
+      });
+    },
+  },
+  {
     id: "variant", phase: "Model", nav: "Try a variant",
     title: "Want to try a variant before committing?",
     sub: "Branching lets you explore a change in isolation. Here: split Packaging into a dedicated Finished-Goods area — see the diff, then keep or revert.",
@@ -462,6 +540,7 @@ const steps = [
         [`${profile().facility} model`, siteName() ? "done" : "open", siteName() ? `${siteName()} · ${areas().length} areas` : "Not named"],
         ["Scheduling", state.planningMode ? "done" : "open", state.planningMode || "Not chosen"],
         [`${profile().resource} model`, state.lineDecision ? "done" : "open", state.lineDecision === "flag" ? "Line 3 flagged for cleanup" : state.lineDecision === "exclude" ? "Line 3 excluded" : "Unresolved"],
+        ["BOM profile", state.bom?.source ? "done" : "open", state.bom?.source ? `${state.bom.structure} · ${state.bom.consumption} · ${state.bom.source}` : "Not characterized"],
         ["Demo evidence", state.demo ? "done" : "open", state.demo ? `${state.demo.score}% training score` : "Pending"],
         ["Migration risk", "info", state.migration ? "S/4 migration on roadmap" : "No migration planned"],
       ];
@@ -495,6 +574,7 @@ const steps = [
       return `
         <div class="summary-grid">
           <div class="summary-card"><span>Model</span><strong>${areas().length} areas · ${workcenters().length} ${escapeHtml(profile().resource.toLowerCase())}s</strong><small>${Model.events().length} committed events</small></div>
+          <div class="summary-card"><span>BOM</span><strong>${state.bom?.structure ? escapeHtml(state.bom.structure) : "Pending"}</strong><small>${state.bom?.source ? escapeHtml(state.bom.source) : "integration grain not set"}</small></div>
           <div class="summary-card"><span>Decisions</span><strong>${decisions.length} governed</strong><small>${decisions.length ? "merge history travels with handoff" : "no branch merges"}</small></div>
           <div class="summary-card"><span>Evidence</span><strong>${state.demo ? state.demo.score + "% training" : "Pending"}</strong><small>${state.demo ? "seeds the support runbook" : "no scored scenario"}</small></div>
           <div class="summary-card"><span>Readiness</span><strong>${readiness()}%</strong><small>at handoff</small></div>
@@ -646,6 +726,7 @@ function exportBrief() {
     site: siteName(),
     areas: areas().map((a) => a.name),
     workcenters: workcenters().map((w) => ({ name: w.name, area: areaName(w.areaId) })),
+    billOfMaterials: state.bom,
     decisions: { lineIssue: state.lineDecision, variant: state.variant, migration: state.migration },
     demo: state.demo,
     readiness: `${readiness()}%`,
