@@ -93,6 +93,21 @@ const archetypeIcons = {
   "healthcare-capacity": "hospital",
 };
 
+const industries = [
+  { id: "pharma", name: "Pharmaceutical / Biopharma", group: "Life sciences", icon: "pill", focus: "GMP batches, potency, genealogy, cleaning, QA release", compliance: "GxP · electronic records · validated processes" },
+  { id: "pesticides", name: "Crop Protection / Pesticides", group: "Agrochemicals", icon: "sprout", focus: "Active ingredients, campaign cleaning, hazardous segregation, pack labels", compliance: "Product registrations · HSE · environmental controls" },
+  { id: "medical-devices", name: "Medical Devices", group: "Life sciences", icon: "stethoscope", focus: "Device history, UDI, controlled assembly, sterilization", compliance: "QMS · traceability · regulated change control" },
+  { id: "food-beverage", name: "Food & Beverage", group: "Consumer process", icon: "utensils", focus: "Shelf life, allergens, recipes, yield, sanitation", compliance: "Food safety · lot traceability · labeling" },
+  { id: "chemicals", name: "Chemicals", group: "Process industries", icon: "flask-conical", focus: "Formulas, tanks, campaigns, co-products, hazardous materials", compliance: "SDS · process safety · environmental controls" },
+  { id: "cpg", name: "Consumer Packaged Goods", group: "Consumer products", icon: "package", focus: "High-SKU packaging, postponement, promotions, changeovers", compliance: "Label control · market variants · traceability" },
+  { id: "automotive", name: "Automotive", group: "Discrete manufacturing", icon: "car", focus: "Sequenced supply, variants, line balance, supplier constraints", compliance: "PPAP · serial genealogy · quality gates" },
+  { id: "industrial", name: "Industrial Equipment", group: "Discrete manufacturing", icon: "cog", focus: "BOM depth, engineer-to-order, skills, tools, long lead parts", compliance: "Configuration control · inspection evidence" },
+  { id: "electronics", name: "Electronics / Semiconductor", group: "High-tech", icon: "microchip", focus: "Reentrant flows, yield, alternates, cleanroom tools", compliance: "Material genealogy · process control · export rules" },
+  { id: "aerospace", name: "Aerospace & Defense", group: "Regulated discrete", icon: "plane", focus: "Effectivity, serialized parts, scarce skills, project networks", compliance: "Airworthiness · full traceability · controlled data" },
+  { id: "metals-mining", name: "Metals / Mining", group: "Primary industries", icon: "mountain", focus: "Blending, grades, campaign assets, energy, extraction", compliance: "Assay · chain of custody · environmental constraints" },
+  { id: "building-materials", name: "Building Materials", group: "Process industries", icon: "brick-wall", focus: "Kilns, campaigns, bulk logistics, energy-intensive assets", compliance: "Quality certificates · emissions · batch traceability" },
+];
+
 const planningLevels = [
   { id: "strategic", level: "Strategic / network planning", horizon: "Years", question: "Where should we make, source, add capacity, or change the footprint?", terms: "Network design · footprint planning · capacity strategy" },
   { id: "sop", level: "Sales & Operations Planning", horizon: "12–24 months", question: "Can demand, supply, inventory, and finance agree on one feasible plan?", terms: "S&OP · IBP · aggregate planning" },
@@ -110,6 +125,7 @@ const initialState = {
   max: 0,
   scope: null,
   archetypes: [],
+  industry: null,
   erp: "sap_pi",
   migration: null,
   calendar: {
@@ -155,6 +171,10 @@ function load() {
       }
       delete state.planningMode;
       delete state.archetype;
+      if (!("industry" in saved) && Number(saved.max || 0) >= 2) {
+        state.i = 3;
+        state.max = Math.max(3, state.max + 1);
+      }
     }
   } catch { state = clone(initialState); }
 }
@@ -176,6 +196,7 @@ function calendarProfile() {
 function selectedArchetypes() {
   return (state.archetypes || []).map((id) => planningArchetypes.find((item) => item.id === id)).filter(Boolean);
 }
+function industry() { return industries.find((item) => item.id === state.industry) || null; }
 function modeMix() {
   const selected = selectedArchetypes();
   const counts = {};
@@ -209,6 +230,7 @@ function readiness() {
   let s = 16;
   if (state.scope) s += 12;
   if (state.archetypes?.length) s += 8;
+  if (state.industry) s += 6;
   if (siteName()) s += 8;
   if (state.calendar?.layering && state.calendar?.pattern && state.calendar?.exceptions && state.calendar?.modifiersConfirmed) s += 8;
   if (state.constraint) s += 6;
@@ -309,19 +331,53 @@ const steps = [
     },
   },
   {
+    id: "industry", phase: "Characterize", nav: "Industry context",
+    title: "Which industry context shapes the implementation?",
+    sub: "Industry does not replace the operating archetype. It adds the regulatory, quality, traceability, safety, and terminology lens that makes the same production pattern behave differently.",
+    hint: "Choose the primary industry context to continue.",
+    gate: () => !!state.industry,
+    body: () => {
+      const selected = industry();
+      return `
+        ${selected ? `
+          <div class="industry-synthesis">
+            <i data-lucide="${selected.icon}"></i>
+            <div><strong>${escapeHtml(selected.name)}</strong><p>${escapeHtml(selected.focus)}</p></div>
+            <span>${escapeHtml(selected.compliance)}</span>
+          </div>` : ""}
+        <div class="industry-grid">
+          ${industries.map((item) => `
+            <button class="industry-card${state.industry === item.id ? " active" : ""}" type="button" data-industry="${item.id}" aria-pressed="${state.industry === item.id}">
+              <i data-lucide="${item.icon}"></i>
+              <span><small>${escapeHtml(item.group)}</small><strong>${escapeHtml(item.name)}</strong><em>${escapeHtml(item.focus)}</em></span>
+            </button>
+          `).join("")}
+        </div>
+      `;
+    },
+    attach: (root) => {
+      root.querySelectorAll("[data-industry]").forEach((button) => button.addEventListener("click", () => {
+        state.industry = button.dataset.industry;
+        render();
+      }));
+    },
+  },
+  {
     id: "dialect", phase: "Characterize", nav: "Dialect",
     title: "Confirm the planning dialect.",
     sub: "The synthesized operating backbone recommends the planning language. Secondary archetypes remain overlays; override the ERP dialect if the client's system differs.",
     body: () => `
       <div class="derive">
         <div class="derive-chain">
+          <span class="chain-node industry-node">${escapeHtml(industry()?.name || "Industry not set")}</span>
+          <i data-lucide="plus"></i>
           <span class="chain-node">${escapeHtml(archetypeSynthesis().count === 1 ? archetypeSynthesis().title : `${archetypeSynthesis().count} reconciled patterns`)}</span>
           <i data-lucide="arrow-right"></i>
           <span class="chain-node accent">${escapeHtml(mode().label)}</span>
           <i data-lucide="arrow-right"></i>
           <span class="chain-node">${escapeHtml(profile().badge)}</span>
         </div>
-        <p class="derive-note">${escapeHtml(mode().note)}</p>
+        <p class="derive-note">${escapeHtml(mode().note)} ${industry() ? `Industry lens: ${escapeHtml(industry().focus)}` : ""}</p>
         <label class="field big-field">
           <span>ERP dialect</span>
           <select id="erpSelect">
@@ -729,6 +785,8 @@ const steps = [
       const r = readiness();
       const rows = [
         ["Planning objective", state.scope ? "done" : "open", state.scope === "aps-ds" ? "Advanced Planning & Detailed Scheduling" : "Not selected"],
+        ["Operating archetypes", state.archetypes?.length ? "done" : "open", state.archetypes?.length ? archetypeSynthesis().title : "Not characterized"],
+        ["Industry context", state.industry ? "done" : "open", industry()?.name || "Not selected"],
         [`${profile().facility} model`, siteName() ? "done" : "open", siteName() ? `${siteName()} · ${areas().length} areas` : "Not named"],
         ["Calendars & capacity", state.calendar?.layering ? "done" : "open", state.calendar?.layering ? `${calendarProfile().base} · ${state.calendar.pattern} · ${state.calendar.exceptions}` : "Not characterized"],
         [`${profile().resource} model`, state.lineDecision ? "done" : "open", state.lineDecision === "flag" ? "Line 3 flagged for cleanup" : state.lineDecision === "exclude" ? "Line 3 excluded" : "Unresolved"],
@@ -766,6 +824,7 @@ const steps = [
       return `
         <div class="summary-grid">
           <div class="summary-card"><span>Objective</span><strong>${state.scope === "aps-ds" ? "APS / Detailed Scheduling" : "Pending"}</strong><small>hours-to-weeks planning horizon</small></div>
+          <div class="summary-card"><span>Industry</span><strong>${industry() ? escapeHtml(industry().name) : "Pending"}</strong><small>${industry() ? escapeHtml(industry().compliance) : "context not selected"}</small></div>
           <div class="summary-card"><span>Model</span><strong>${areas().length} areas · ${workcenters().length} ${escapeHtml(profile().resource.toLowerCase())}s</strong><small>${Model.events().length} committed events</small></div>
           <div class="summary-card"><span>BOM</span><strong>${state.bom?.structure ? escapeHtml(state.bom.structure) : "Pending"}</strong><small>${state.bom?.source ? escapeHtml(state.bom.source) : "integration grain not set"}</small></div>
           <div class="summary-card"><span>Capacity</span><strong>${state.calendar?.layering ? escapeHtml(state.calendar.layering) : "Pending"}</strong><small>${state.calendar?.pattern ? escapeHtml(state.calendar.pattern) : "calendar pattern not set"}</small></div>
@@ -910,6 +969,7 @@ function exportBrief() {
   const brief = {
     product: "ImplementationOS for Manufacturing Software",
     planningObjective: planningLevels.find((item) => item.id === state.scope) || null,
+    industry: industry(),
     archetypes: selectedArchetypes().map(({ id, name, mode: archetypeMode }) => ({ id, name, mode: archetypeMode })),
     archetypeSynthesis: { ...archetypeSynthesis(), ...modeMix(), dominantLabel: mode().label },
     mode: mode().label,
