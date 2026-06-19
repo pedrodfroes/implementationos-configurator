@@ -4116,13 +4116,15 @@ body.genesis-open {
   margin-top: 1px;
 }
 
-.bom-profile {
+.bom-profile,
+.capacity-profile {
   display: grid;
   gap: 22px;
   max-width: 860px;
 }
 
-.bom-dimension {
+.bom-dimension,
+.capacity-dimension {
   display: grid;
   grid-template-columns: 170px minmax(0, 1fr);
   gap: 18px;
@@ -4159,15 +4161,18 @@ body.genesis-open {
   line-height: 1.35;
 }
 
-.bom-profile .choice-grid {
+.bom-profile .choice-grid,
+.capacity-profile .choice-grid {
   max-width: none;
 }
 
-.bom-profile .choice {
+.bom-profile .choice,
+.capacity-profile .choice {
   min-height: 112px;
 }
 
-.bom-features {
+.bom-features,
+.capacity-modifiers {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
@@ -4585,12 +4590,14 @@ body.genesis-open {
     grid-template-columns: 1fr;
   }
 
-  .bom-dimension {
+  .bom-dimension,
+  .capacity-dimension {
     grid-template-columns: 1fr;
     gap: 9px;
   }
 
-  .bom-features {
+  .bom-features,
+  .capacity-modifiers {
     grid-template-columns: 1fr 1fr;
   }
 
@@ -4603,7 +4610,8 @@ body.genesis-open {
 }
 
 @media (max-width: 560px) {
-  .bom-features {
+  .bom-features,
+  .capacity-modifiers {
     grid-template-columns: 1fr;
   }
 }

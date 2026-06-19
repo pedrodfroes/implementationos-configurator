@@ -36,6 +36,14 @@ const profiles = {
   ifs: { badge: "IFS", name: "IFS Cloud", order: "Shop order", route: "Routing", facility: "Site", storage: "Warehouse", bin: "Location", area: "Production Line", resource: "Work Center", hierarchy: ["Company", "Site", "Warehouse", "Location"] },
 };
 
+const calendarProfiles = {
+  sap: { base: "Factory Calendar", pattern: "Shift / Shift Sequence / Work Schedule", resource: "Work Center Capacity", exception: "Calendar or capacity override", units: "Individual Capacity", efficiency: "Utilization", category: "Capacity Category" },
+  oracle: { base: "Production Calendar", pattern: "Shift", resource: "Work Center Resource Calendar", exception: "Resource Exception", units: "Default Units Available", efficiency: "Efficiency", category: "Resource" },
+  d365: { base: "Calendar", pattern: "Working Time Template / Working Times", resource: "Resource Calendar", exception: "Calendar exception", units: "Capacity", efficiency: "Efficiency", category: "Resource / Resource Group" },
+  infor_ln: { base: "Calendar Code", pattern: "Recurrence / Working Hours", resource: "Work Center Calendar", exception: "Calendar Exception", units: "Resource capacity", efficiency: "Efficiency", category: "Availability Type" },
+  generic: { base: "Production Calendar", pattern: "Shift / Working Time", resource: "Resource Calendar", exception: "Availability Exception", units: "Units Available", efficiency: "Efficiency / Utilization", category: "Capacity Type" },
+};
+
 // The archetype's manufacturing MODE — not the industry — predicts the
 // dialect. Process plants talk in process orders and recipes; discrete
 // plants in production orders and routings.
@@ -74,6 +82,13 @@ const initialState = {
   erp: "sap_pi",
   migration: null,
   planningMode: null,
+  calendar: {
+    layering: null,
+    pattern: null,
+    exceptions: null,
+    modifiers: [],
+    modifiersConfirmed: false,
+  },
   constraint: null,
   lineDecision: null,
   bom: {
@@ -103,6 +118,10 @@ function load() {
 
 // ── Derived helpers (graph is the source of truth) ───────────────────
 function profile() { return profiles[state.erp]; }
+function calendarProfile() {
+  if (["sap_pp", "sap_pi", "s4"].includes(state.erp)) return calendarProfiles.sap;
+  return calendarProfiles[state.erp] || calendarProfiles.generic;
+}
 function archetype() { return planningArchetypes.find((a) => a.id === state.archetype) || null; }
 function mode() { return modeProfiles[archetype()?.mode || "process"]; }
 function areas() { return Model.nodesOfType("area").map((n) => ({ id: n.id, ...n.props })); }
@@ -115,6 +134,7 @@ function readiness() {
   if (state.archetype) s += 8;
   if (siteName()) s += 8;
   if (state.planningMode) s += 8;
+  if (state.calendar?.layering && state.calendar?.pattern && state.calendar?.exceptions && state.calendar?.modifiersConfirmed) s += 8;
   if (state.constraint) s += 6;
   if (state.lineDecision) s += 10;
   if (state.bom?.structure && state.bom?.featuresConfirmed && state.bom?.consumption && state.bom?.source) s += 8;
@@ -262,6 +282,76 @@ const steps = [
       </div>
     `,
     attach: (root) => bindChoices(root, (v) => { state.planningMode = v; render(); }),
+  },
+  {
+    id: "calendar", phase: "Facility", nav: "Calendars & capacity",
+    title: "Where does available capacity really come from?",
+    sub: () => `${calendarProfile().base} defines broad working days; ${calendarProfile().resource} determines whether a specific ${profile().resource.toLowerCase()} can actually run. Capture both layers before APS interprets an open day as usable capacity.`,
+    hint: "Complete all four calendar and capacity dimensions to continue.",
+    gate: () => !!(state.calendar?.layering && state.calendar?.pattern && state.calendar?.exceptions && state.calendar?.modifiersConfirmed),
+    body: () => {
+      const cal = state.calendar || initialState.calendar;
+      const terms = calendarProfile();
+      const modifier = (value, icon, title, sub) => choiceTile(value, cal.modifiers.includes(value), icon, title, sub).replace("data-choice", "data-calendar-modifier");
+      return `
+        <div class="capacity-profile">
+          <section class="capacity-dimension">
+            <div class="dimension-heading"><span>01</span><div><strong>Availability layers</strong><small>Where open time is defined</small></div></div>
+            <div class="choice-grid three compact" data-calendar-group="layering">
+              ${choiceTile("facility-only", cal.layering === "facility-only", "calendar-days", terms.base, `Only the ${profile().facility.toLowerCase()}-level calendar is available`)}
+              ${choiceTile("resource-only", cal.layering === "resource-only", "cpu", terms.resource, `Availability is maintained directly on each ${profile().resource.toLowerCase()}`)}
+              ${choiceTile("layered", cal.layering === "layered", "layers-3", "Layered calendars", `${terms.base} plus ${terms.resource.toLowerCase()} overrides`)}
+            </div>
+          </section>
+          <section class="capacity-dimension">
+            <div class="dimension-heading"><span>02</span><div><strong>Working-time pattern</strong><small>${escapeHtml(terms.pattern)}</small></div></div>
+            <div class="choice-grid three compact" data-calendar-group="pattern">
+              ${choiceTile("single-shift", cal.pattern === "single-shift", "sun", "Single shift", "One recurring work interval per working day")}
+              ${choiceTile("multi-shift", cal.pattern === "multi-shift", "clock-3", "Multiple shifts", "Two or more named intervals share the day")}
+              ${choiceTile("variable", cal.pattern === "variable", "calendar-range", "Variable / rotating", "Patterns change by day, week, crew, or activity")}
+            </div>
+          </section>
+          <section class="capacity-dimension">
+            <div class="dimension-heading"><span>03</span><div><strong>Exceptions</strong><small>${escapeHtml(terms.exception)}</small></div></div>
+            <div class="choice-grid three compact" data-calendar-group="exceptions">
+              ${choiceTile("base-only", cal.exceptions === "base-only", "calendar-off", "Base-calendar only", "Holidays and closures apply broadly")}
+              ${choiceTile("resource-overrides", cal.exceptions === "resource-overrides", "wrench", "Resource overrides", "Maintenance and local downtime override open days")}
+              ${choiceTile("multi-activity", cal.exceptions === "multi-activity", "calendar-cog", "Activity-specific", "Production, service, logistics, or other availability differs")}
+            </div>
+          </section>
+          <section class="capacity-dimension">
+            <div class="dimension-heading"><span>04</span><div><strong>Capacity modifiers</strong><small>Select all supplied by the ERP</small></div></div>
+            <div class="choice-grid compact capacity-modifiers">
+              ${modifier("units", "copy", terms.units, "Number of parallel people, machines, or capacity units")}
+              ${modifier("efficiency", "gauge", terms.efficiency, "Usable percentage or performance factor")}
+              ${modifier("category", "tags", terms.category, "Machine, labor, setup, processing, or activity type")}
+              ${choiceTile("none", cal.modifiersConfirmed && cal.modifiers.length === 0, "circle-slash-2", "None supplied", "Use working time without additional modifiers").replace("data-choice", "data-calendar-modifier-none")}
+            </div>
+          </section>
+        </div>
+      `;
+    },
+    attach: (root) => {
+      root.querySelectorAll("[data-calendar-group]").forEach((group) => {
+        group.querySelectorAll("[data-choice]").forEach((button) => button.addEventListener("click", () => {
+          state.calendar[group.dataset.calendarGroup] = button.dataset.choice;
+          render();
+        }));
+      });
+      root.querySelectorAll("[data-calendar-modifier]").forEach((button) => button.addEventListener("click", () => {
+        const value = button.dataset.calendarModifier;
+        const selected = new Set(state.calendar.modifiers);
+        selected.has(value) ? selected.delete(value) : selected.add(value);
+        state.calendar.modifiers = [...selected];
+        state.calendar.modifiersConfirmed = true;
+        render();
+      }));
+      root.querySelector("[data-calendar-modifier-none]")?.addEventListener("click", () => {
+        state.calendar.modifiers = [];
+        state.calendar.modifiersConfirmed = true;
+        render();
+      });
+    },
   },
   {
     id: "constraint", phase: "Facility", nav: "Constraint view",
@@ -539,6 +629,7 @@ const steps = [
       const rows = [
         [`${profile().facility} model`, siteName() ? "done" : "open", siteName() ? `${siteName()} · ${areas().length} areas` : "Not named"],
         ["Scheduling", state.planningMode ? "done" : "open", state.planningMode || "Not chosen"],
+        ["Calendars & capacity", state.calendar?.layering ? "done" : "open", state.calendar?.layering ? `${calendarProfile().base} · ${state.calendar.pattern} · ${state.calendar.exceptions}` : "Not characterized"],
         [`${profile().resource} model`, state.lineDecision ? "done" : "open", state.lineDecision === "flag" ? "Line 3 flagged for cleanup" : state.lineDecision === "exclude" ? "Line 3 excluded" : "Unresolved"],
         ["BOM profile", state.bom?.source ? "done" : "open", state.bom?.source ? `${state.bom.structure} · ${state.bom.consumption} · ${state.bom.source}` : "Not characterized"],
         ["Demo evidence", state.demo ? "done" : "open", state.demo ? `${state.demo.score}% training score` : "Pending"],
@@ -575,6 +666,7 @@ const steps = [
         <div class="summary-grid">
           <div class="summary-card"><span>Model</span><strong>${areas().length} areas · ${workcenters().length} ${escapeHtml(profile().resource.toLowerCase())}s</strong><small>${Model.events().length} committed events</small></div>
           <div class="summary-card"><span>BOM</span><strong>${state.bom?.structure ? escapeHtml(state.bom.structure) : "Pending"}</strong><small>${state.bom?.source ? escapeHtml(state.bom.source) : "integration grain not set"}</small></div>
+          <div class="summary-card"><span>Capacity</span><strong>${state.calendar?.layering ? escapeHtml(state.calendar.layering) : "Pending"}</strong><small>${state.calendar?.pattern ? escapeHtml(state.calendar.pattern) : "calendar pattern not set"}</small></div>
           <div class="summary-card"><span>Decisions</span><strong>${decisions.length} governed</strong><small>${decisions.length ? "merge history travels with handoff" : "no branch merges"}</small></div>
           <div class="summary-card"><span>Evidence</span><strong>${state.demo ? state.demo.score + "% training" : "Pending"}</strong><small>${state.demo ? "seeds the support runbook" : "no scored scenario"}</small></div>
           <div class="summary-card"><span>Readiness</span><strong>${readiness()}%</strong><small>at handoff</small></div>
@@ -727,6 +819,10 @@ function exportBrief() {
     areas: areas().map((a) => a.name),
     workcenters: workcenters().map((w) => ({ name: w.name, area: areaName(w.areaId) })),
     billOfMaterials: state.bom,
+    calendarAndCapacity: {
+      terminology: calendarProfile(),
+      profile: state.calendar,
+    },
     decisions: { lineIssue: state.lineDecision, variant: state.variant, migration: state.migration },
     demo: state.demo,
     readiness: `${readiness()}%`,
