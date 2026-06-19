@@ -822,6 +822,7 @@ function render() {
   const title = typeof step.title === "function" ? step.title() : step.title;
   const sub = typeof step.sub === "function" ? step.sub() : step.sub;
   $("#stageCount").textContent = `Step ${state.i + 1} of ${steps.length}`;
+  $("#stageBody").dataset.step = step.id;
   $("#stageBody").innerHTML = `
     <div class="step">
       <p class="step-phase">${escapeHtml(step.phase)}</p>

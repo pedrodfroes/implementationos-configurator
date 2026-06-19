@@ -3802,6 +3802,31 @@ body.genesis-open {
   padding: 2px;
 }
 
+@media (min-width: 861px) {
+  .stage-body[data-step="archetype"] {
+    max-width: none;
+    padding-left: clamp(28px, 3vw, 56px);
+    padding-right: clamp(28px, 3vw, 56px);
+  }
+
+  .stage-body[data-step="archetype"] .step-sub {
+    margin-bottom: 18px;
+    max-width: 760px;
+  }
+
+  .stage-body[data-step="archetype"] .pick-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+@media (min-width: 861px) and (max-width: 1280px) {
+  .stage-body[data-step="archetype"] .pick-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 .pick-card {
   text-align: left;
   border: 1px solid var(--line);
