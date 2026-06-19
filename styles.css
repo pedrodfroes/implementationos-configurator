@@ -4431,14 +4431,16 @@ body.genesis-open {
 }
 
 .bom-profile,
-.capacity-profile {
+.capacity-profile,
+.execution-profile {
   display: grid;
   gap: 22px;
   max-width: 860px;
 }
 
 .bom-dimension,
-.capacity-dimension {
+.capacity-dimension,
+.execution-dimension {
   display: grid;
   grid-template-columns: 170px minmax(0, 1fr);
   gap: 18px;
@@ -4476,18 +4478,46 @@ body.genesis-open {
 }
 
 .bom-profile .choice-grid,
-.capacity-profile .choice-grid {
+.capacity-profile .choice-grid,
+.execution-profile .choice-grid {
   max-width: none;
 }
 
 .bom-profile .choice,
-.capacity-profile .choice {
+.capacity-profile .choice,
+.execution-profile .choice {
   min-height: 112px;
 }
 
 .bom-features,
 .capacity-modifiers {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.execution-signals {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.execution-synthesis {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  max-width: 860px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--violet);
+  border-radius: 8px;
+  background: var(--violet-soft);
+  color: var(--ink);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.execution-synthesis > i {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  color: var(--violet);
 }
 
 .variant-live,
@@ -4922,13 +4952,15 @@ body.genesis-open {
   }
 
   .bom-dimension,
-  .capacity-dimension {
+  .capacity-dimension,
+  .execution-dimension {
     grid-template-columns: 1fr;
     gap: 9px;
   }
 
   .bom-features,
-  .capacity-modifiers {
+  .capacity-modifiers,
+  .execution-signals {
     grid-template-columns: 1fr 1fr;
   }
 
@@ -4946,7 +4978,8 @@ body.genesis-open {
   }
 
   .bom-features,
-  .capacity-modifiers {
+  .capacity-modifiers,
+  .execution-signals {
     grid-template-columns: 1fr;
   }
 }

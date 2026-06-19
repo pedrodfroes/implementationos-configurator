@@ -144,6 +144,13 @@ const initialState = {
     consumption: null,
     source: null,
   },
+  execution: {
+    source: null,
+    levels: [],
+    events: [],
+    quantities: [],
+    quantitiesConfirmed: false,
+  },
   variant: null, // null | "active" | "kept" | "reverted" | "skipped"
   demo: null, // { laneId, score, note }
   done: false,
@@ -175,6 +182,10 @@ function load() {
         state.i = 3;
         state.max = Math.max(3, state.max + 1);
       }
+      if (!("execution" in saved) && Number(saved.max || 0) >= 11) {
+        state.i = 12;
+        state.max = Math.max(12, state.max + 1);
+      }
     }
   } catch { state = clone(initialState); }
 }
@@ -197,6 +208,9 @@ function selectedArchetypes() {
   return (state.archetypes || []).map((id) => planningArchetypes.find((item) => item.id === id)).filter(Boolean);
 }
 function industry() { return industries.find((item) => item.id === state.industry) || null; }
+function executionSourceLabel() {
+  return { erp: `${profile().badge} confirmations`, mes: "MES execution events", hybrid: `Hybrid MES + ${profile().badge}` }[state.execution?.source] || "Not configured";
+}
 function modeMix() {
   const selected = selectedArchetypes();
   const counts = {};
@@ -236,6 +250,7 @@ function readiness() {
   if (state.constraint) s += 6;
   if (state.lineDecision) s += 10;
   if (state.bom?.structure && state.bom?.featuresConfirmed && state.bom?.consumption && state.bom?.source) s += 8;
+  if (state.execution?.source && state.execution?.levels?.length && state.execution?.events?.length && state.execution?.quantitiesConfirmed) s += 8;
   if (state.variant && state.variant !== "active") s += 6;
   if (state.demo) s += Math.round(state.demo.score * 0.24);
   if (state.migration) s -= 4;
@@ -674,6 +689,89 @@ const steps = [
     },
   },
   {
+    id: "execution", phase: "Model", nav: "Execution feedback",
+    title: "How does actual execution return to planning?",
+    sub: () => `Configure the feedback contract separately from the ${profile().route.toLowerCase()}. MES events and ${profile().badge} confirmations may describe the same work at different levels and times.`,
+    hint: "Complete the source, reporting level, event, and quantity configuration.",
+    gate: () => !!(state.execution?.source && state.execution?.levels?.length && state.execution?.events?.length && state.execution?.quantitiesConfirmed),
+    body: () => {
+      const execution = state.execution || initialState.execution;
+      const signal = (group, value, icon, title, sub) => {
+        const attribute = { levels: "level", events: "event", quantities: "quantity" }[group];
+        return choiceTile(value, execution[group].includes(value), icon, title, sub).replace("data-choice", `data-execution-${attribute}`);
+      };
+      const sourceNote = {
+        erp: `${profile().badge} is the execution system of record and sends official confirmations.`,
+        mes: `MES sends detailed execution events; ${profile().badge} remains planning context rather than the confirmation source.`,
+        hybrid: `MES provides event detail while ${profile().badge} provides official postings; identifiers and duplicate-event rules must reconcile both.`,
+      }[execution.source];
+      return `
+        ${sourceNote ? `<div class="execution-synthesis"><i data-lucide="refresh-cw"></i><span>${escapeHtml(sourceNote)}</span></div>` : ""}
+        <div class="execution-profile">
+          <section class="execution-dimension">
+            <div class="dimension-heading"><span>01</span><div><strong>System of record</strong><small>Who publishes execution truth</small></div></div>
+            <div class="choice-grid three compact" data-execution-group="source">
+              ${choiceTile("erp", execution.source === "erp", "database", `${profile().badge} confirmations`, "ERP owns starts, finishes, and quantities")}
+              ${choiceTile("mes", execution.source === "mes", "monitor-cog", "MES execution events", "MES owns detailed shop-floor feedback")}
+              ${choiceTile("hybrid", execution.source === "hybrid", "git-merge", "Hybrid MES + ERP", "MES detail reconciled to official ERP postings")}
+            </div>
+          </section>
+          <section class="execution-dimension">
+            <div class="dimension-heading"><span>02</span><div><strong>Reporting level</strong><small>Select every level received</small></div></div>
+            <div class="choice-grid three compact">
+              ${signal("levels", "order-batch", "clipboard-list", `${profile().order} / batch`, "One confirmation summarizes the whole order or batch")}
+              ${signal("levels", "operation-step", "list-checks", "Operation / step", "Feedback is attached to a routing operation or instruction step")}
+              ${signal("levels", "phase", "split", "Phase", "Process phases publish their own execution status")}
+            </div>
+          </section>
+          <section class="execution-dimension">
+            <div class="dimension-heading"><span>03</span><div><strong>Lifecycle events</strong><small>Select every event received</small></div></div>
+            <div class="choice-grid three compact">
+              ${signal("events", "start", "play", "Start", "Actual start of an order, operation, step, or phase")}
+              ${signal("events", "end", "square-check-big", "End / completion", "Final completion or technically complete status")}
+              ${signal("events", "partial", "circle-dot-dashed", "Partial / progress", "Incremental confirmation before final completion")}
+            </div>
+          </section>
+          <section class="execution-dimension">
+            <div class="dimension-heading"><span>04</span><div><strong>Quantity outcomes</strong><small>Select every quantity received</small></div></div>
+            <div class="choice-grid compact execution-signals">
+              ${signal("quantities", "yield", "badge-check", "Yield / good quantity", "Accepted production quantity or process yield")}
+              ${signal("quantities", "scrap", "trash-2", "Scrap / reject", "Rejected quantity and optional reason code")}
+              ${signal("quantities", "rework", "rotate-ccw", "Rework", "Quantity routed back into correction or reprocessing")}
+              ${signal("quantities", "consumption", "package-minus", "Material consumption", "Actual component, ingredient, lot, or container usage")}
+              ${choiceTile("status-only", execution.quantitiesConfirmed && execution.quantities.length === 0, "activity", "Status only", "No execution quantities are supplied").replace("data-choice", "data-execution-quantity-none")}
+            </div>
+          </section>
+        </div>
+      `;
+    },
+    attach: (root) => {
+      root.querySelectorAll("[data-execution-group]").forEach((group) => {
+        group.querySelectorAll("[data-choice]").forEach((button) => button.addEventListener("click", () => {
+          state.execution[group.dataset.executionGroup] = button.dataset.choice;
+          render();
+        }));
+      });
+      ["level", "event", "quantity"].forEach((group) => {
+        root.querySelectorAll(`[data-execution-${group}]`).forEach((button) => button.addEventListener("click", () => {
+          const key = { level: "levels", event: "events", quantity: "quantities" }[group];
+          const selected = new Set(state.execution[key]);
+          selected.has(button.dataset[`execution${group[0].toUpperCase()}${group.slice(1)}`])
+            ? selected.delete(button.dataset[`execution${group[0].toUpperCase()}${group.slice(1)}`])
+            : selected.add(button.dataset[`execution${group[0].toUpperCase()}${group.slice(1)}`]);
+          state.execution[key] = [...selected];
+          if (group === "quantity") state.execution.quantitiesConfirmed = true;
+          render();
+        }));
+      });
+      root.querySelector("[data-execution-quantity-none]")?.addEventListener("click", () => {
+        state.execution.quantities = [];
+        state.execution.quantitiesConfirmed = true;
+        render();
+      });
+    },
+  },
+  {
     id: "variant", phase: "Model", nav: "Try a variant",
     title: "Want to try a variant before committing?",
     sub: "Branching lets you explore a change in isolation. Here: split Packaging into a dedicated Finished-Goods area — see the diff, then keep or revert.",
@@ -791,6 +889,7 @@ const steps = [
         ["Calendars & capacity", state.calendar?.layering ? "done" : "open", state.calendar?.layering ? `${calendarProfile().base} · ${state.calendar.pattern} · ${state.calendar.exceptions}` : "Not characterized"],
         [`${profile().resource} model`, state.lineDecision ? "done" : "open", state.lineDecision === "flag" ? "Line 3 flagged for cleanup" : state.lineDecision === "exclude" ? "Line 3 excluded" : "Unresolved"],
         ["BOM profile", state.bom?.source ? "done" : "open", state.bom?.source ? `${state.bom.structure} · ${state.bom.consumption} · ${state.bom.source}` : "Not characterized"],
+        ["Execution feedback", state.execution?.source ? "done" : "open", state.execution?.source ? `${executionSourceLabel()} · ${state.execution.events.join(", ")}` : "Not configured"],
         ["Demo evidence", state.demo ? "done" : "open", state.demo ? `${state.demo.score}% training score` : "Pending"],
         ["Migration risk", "info", state.migration ? "S/4 migration on roadmap" : "No migration planned"],
       ];
@@ -828,6 +927,7 @@ const steps = [
           <div class="summary-card"><span>Model</span><strong>${areas().length} areas · ${workcenters().length} ${escapeHtml(profile().resource.toLowerCase())}s</strong><small>${Model.events().length} committed events</small></div>
           <div class="summary-card"><span>BOM</span><strong>${state.bom?.structure ? escapeHtml(state.bom.structure) : "Pending"}</strong><small>${state.bom?.source ? escapeHtml(state.bom.source) : "integration grain not set"}</small></div>
           <div class="summary-card"><span>Capacity</span><strong>${state.calendar?.layering ? escapeHtml(state.calendar.layering) : "Pending"}</strong><small>${state.calendar?.pattern ? escapeHtml(state.calendar.pattern) : "calendar pattern not set"}</small></div>
+          <div class="summary-card"><span>Execution</span><strong>${escapeHtml(executionSourceLabel())}</strong><small>${state.execution?.events?.length ? escapeHtml(state.execution.events.join(" · ")) : "feedback events not set"}</small></div>
           <div class="summary-card"><span>Decisions</span><strong>${decisions.length} governed</strong><small>${decisions.length ? "merge history travels with handoff" : "no branch merges"}</small></div>
           <div class="summary-card"><span>Evidence</span><strong>${state.demo ? state.demo.score + "% training" : "Pending"}</strong><small>${state.demo ? "seeds the support runbook" : "no scored scenario"}</small></div>
           <div class="summary-card"><span>Readiness</span><strong>${readiness()}%</strong><small>at handoff</small></div>
@@ -991,6 +1091,10 @@ function exportBrief() {
     calendarAndCapacity: {
       terminology: calendarProfile(),
       profile: state.calendar,
+    },
+    executionFeedback: {
+      sourceLabel: executionSourceLabel(),
+      ...state.execution,
     },
     decisions: { lineIssue: state.lineDecision, variant: state.variant, migration: state.migration },
     demo: state.demo,
