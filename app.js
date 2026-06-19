@@ -74,10 +74,22 @@ const planningArchetypes = [
   { id: "healthcare-capacity", name: "Healthcare / Capacity", core: "Patients flow through constrained resources with uncertain durations.", mode: "service" },
 ];
 
+const planningLevels = [
+  { id: "strategic", level: "Strategic / network planning", horizon: "Years", question: "Where should we make, source, add capacity, or change the footprint?", terms: "Network design · footprint planning · capacity strategy" },
+  { id: "sop", level: "Sales & Operations Planning", horizon: "12–24 months", question: "Can demand, supply, inventory, and finance agree on one feasible plan?", terms: "S&OP · IBP · aggregate planning" },
+  { id: "master", level: "Master planning", horizon: "3–18 months", question: "What finished goods should we plan to make by period?", terms: "MPS · RCCP · master scheduling" },
+  { id: "material", level: "Material planning", horizon: "Weeks–months", question: "What materials and components are needed, and when?", terms: "MRP · DRP · procurement planning" },
+  { id: "capacity", level: "Capacity planning", horizon: "Weeks–months", question: "Do we have enough labor, machines, tools, and suppliers?", terms: "CRP · RCCP · infinite / finite capacity" },
+  { id: "aps-ds", level: "Advanced Planning & Detailed Scheduling", horizon: "Hours–weeks", question: "Which operation runs where, when, and in what sequence?", terms: "APS · DS · FCS · finite scheduling", available: true },
+  { id: "dispatch", level: "Dispatching / execution", horizon: "Now–days", question: "What should the shop floor do next?", terms: "Dispatch list · MES · shop-floor control" },
+  { id: "monitoring", level: "Monitoring / control", horizon: "Real time–days", question: "Are we late, blocked, starved, overloaded, or deviating?", terms: "WIP control · ATP / CTP · exception management" },
+];
+
 // ── State ────────────────────────────────────────────────────────────
 const initialState = {
   i: 0,
   max: 0,
+  scope: null,
   archetype: null,
   erp: "sap_pi",
   migration: null,
@@ -112,7 +124,14 @@ function save() {
 function load() {
   try {
     const raw = localStorage.getItem(UI_KEY);
-    if (raw) state = { ...clone(initialState), ...JSON.parse(raw) };
+    if (raw) {
+      const saved = JSON.parse(raw);
+      state = { ...clone(initialState), ...saved };
+      if (!("scope" in saved)) {
+        state.i = 1;
+        state.max = Math.max(1, Number(saved.max || 0) + 1);
+      }
+    }
   } catch { state = clone(initialState); }
 }
 
@@ -131,6 +150,7 @@ function areaName(id) { return areas().find((a) => a.id === id)?.name || "Unassi
 
 function readiness() {
   let s = 16;
+  if (state.scope) s += 4;
   if (state.archetype) s += 8;
   if (siteName()) s += 8;
   if (state.planningMode) s += 8;
@@ -161,6 +181,36 @@ const steps = [
         <li><i data-lucide="gauge"></i><span>Watch readiness build as you make each decision.</span></li>
       </ul>
     `,
+  },
+  {
+    id: "scope", phase: "Scope", nav: "Planning objective",
+    title: "What are you actually trying to accomplish?",
+    sub: "Choose the planning level before describing the manufacturing archetype. Adjacent levels stay visible so the project boundary is explicit, but this demo currently supports APS and Detailed Scheduling only.",
+    hint: "Select Advanced Planning & Detailed Scheduling to continue.",
+    gate: () => state.scope === "aps-ds",
+    body: () => `
+      <div class="scope-grid">
+        ${planningLevels.map((item, index) => `
+          <button class="scope-card${item.available ? " available" : " inactive"}${state.scope === item.id ? " active" : ""}" type="button"
+            ${item.available ? `data-scope="${item.id}"` : "disabled"}
+            title="${item.available ? "Available in this demo" : "Visible for context; not active in this demo yet"}">
+            <span class="scope-index">${String(index + 1).padStart(2, "0")}</span>
+            <span class="scope-copy">
+              <span class="scope-topline"><strong>${escapeHtml(item.level)}</strong><em>${escapeHtml(item.horizon)}</em></span>
+              <span class="scope-question">${escapeHtml(item.question)}</span>
+              <small>${escapeHtml(item.terms)}</small>
+            </span>
+            <i data-lucide="${item.available ? "arrow-right" : "lock-keyhole"}"></i>
+          </button>
+        `).join("")}
+      </div>
+    `,
+    attach: (root) => {
+      root.querySelector("[data-scope]")?.addEventListener("click", (event) => {
+        state.scope = event.currentTarget.dataset.scope;
+        render();
+      });
+    },
   },
   {
     id: "archetype", phase: "Characterize", nav: "Archetype",
@@ -627,6 +677,7 @@ const steps = [
     body: () => {
       const r = readiness();
       const rows = [
+        ["Planning objective", state.scope ? "done" : "open", state.scope === "aps-ds" ? "Advanced Planning & Detailed Scheduling" : "Not selected"],
         [`${profile().facility} model`, siteName() ? "done" : "open", siteName() ? `${siteName()} · ${areas().length} areas` : "Not named"],
         ["Scheduling", state.planningMode ? "done" : "open", state.planningMode || "Not chosen"],
         ["Calendars & capacity", state.calendar?.layering ? "done" : "open", state.calendar?.layering ? `${calendarProfile().base} · ${state.calendar.pattern} · ${state.calendar.exceptions}` : "Not characterized"],
@@ -664,6 +715,7 @@ const steps = [
       const decisions = Model.nodesOfType("decision");
       return `
         <div class="summary-grid">
+          <div class="summary-card"><span>Objective</span><strong>${state.scope === "aps-ds" ? "APS / Detailed Scheduling" : "Pending"}</strong><small>hours-to-weeks planning horizon</small></div>
           <div class="summary-card"><span>Model</span><strong>${areas().length} areas · ${workcenters().length} ${escapeHtml(profile().resource.toLowerCase())}s</strong><small>${Model.events().length} committed events</small></div>
           <div class="summary-card"><span>BOM</span><strong>${state.bom?.structure ? escapeHtml(state.bom.structure) : "Pending"}</strong><small>${state.bom?.source ? escapeHtml(state.bom.source) : "integration grain not set"}</small></div>
           <div class="summary-card"><span>Capacity</span><strong>${state.calendar?.layering ? escapeHtml(state.calendar.layering) : "Pending"}</strong><small>${state.calendar?.pattern ? escapeHtml(state.calendar.pattern) : "calendar pattern not set"}</small></div>
@@ -802,6 +854,7 @@ function advance() {
 function exportBrief() {
   const brief = {
     product: "ImplementationOS for Manufacturing Software",
+    planningObjective: planningLevels.find((item) => item.id === state.scope) || null,
     archetype: archetype()?.name,
     mode: mode().label,
     dialect: profile().badge,

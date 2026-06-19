@@ -3845,6 +3845,106 @@ body.genesis-open {
   color: var(--muted);
 }
 
+.scope-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  max-width: 920px;
+}
+
+.scope-card {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 18px;
+  gap: 10px;
+  align-items: start;
+  min-height: 112px;
+  padding: 14px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.scope-card.inactive {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.scope-card.available {
+  border-color: var(--teal);
+  background: var(--teal-soft);
+}
+
+.scope-card.available:hover,
+.scope-card.active {
+  border-color: var(--teal);
+  box-shadow: var(--shadow);
+}
+
+.scope-card.active {
+  outline: 2px solid var(--teal);
+  outline-offset: -2px;
+}
+
+.scope-index {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding-top: 2px;
+}
+
+.scope-copy,
+.scope-topline {
+  display: flex;
+}
+
+.scope-copy {
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.scope-topline {
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.scope-topline strong {
+  color: var(--ink);
+  font-size: 0.82rem;
+}
+
+.scope-topline em {
+  flex: 0 0 auto;
+  color: var(--teal);
+  font-size: 0.66rem;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.scope-question {
+  color: var(--ink);
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.scope-copy small {
+  color: var(--muted);
+  font-size: 0.66rem;
+  line-height: 1.35;
+}
+
+.scope-card > i {
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+}
+
+.scope-card.available > i {
+  color: var(--teal);
+}
+
 .choice-grid {
   display: grid;
   gap: 12px;
@@ -4587,6 +4687,10 @@ body.genesis-open {
   }
 
   .choice-grid.three {
+    grid-template-columns: 1fr;
+  }
+
+  .scope-grid {
     grid-template-columns: 1fr;
   }
 
