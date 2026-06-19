@@ -140,6 +140,14 @@ function load() {
 
 // ── Derived helpers (graph is the source of truth) ───────────────────
 function profile() { return profiles[state.erp]; }
+function organizationTerm() {
+  const compact = {
+    oracle: "Inventory Organization",
+    peoplesoft: "Manufacturing BU",
+    epicor: "Site / Plant",
+  };
+  return compact[state.erp] || profile().facility;
+}
 function calendarProfile() {
   if (["sap_pp", "sap_pi", "s4"].includes(state.erp)) return calendarProfiles.sap;
   return calendarProfiles[state.erp] || calendarProfiles.generic;
@@ -300,10 +308,10 @@ const steps = [
     attach: (root) => bindChoices(root, (v) => { state.migration = v === "yes"; render(); }),
   },
   {
-    id: "site", phase: "Facility", nav: "Facility name",
+    id: "site", phase: () => organizationTerm(), nav: () => `${organizationTerm()} name`,
     title: () => `Name the ${profile().facility.toLowerCase()}.`,
     sub: () => `In ${profile().badge}, this is the ${profile().facility}. Every ${profile().area.toLowerCase()}, ${profile().resource.toLowerCase()}, storage object, and decision hangs off it.`,
-    hint: "Enter the facility name to continue.",
+    hint: () => `Enter the ${organizationTerm().toLowerCase()} name to continue.`,
     gate: () => siteName().trim().length > 0,
     body: () => `
       <label class="field big-field solo">
@@ -321,7 +329,7 @@ const steps = [
     },
   },
   {
-    id: "calendar", phase: "Facility", nav: "Calendars & capacity",
+    id: "calendar", phase: () => organizationTerm(), nav: "Calendars & capacity",
     title: "Where does available capacity really come from?",
     sub: () => `${calendarProfile().base} defines broad working days; ${calendarProfile().resource} determines whether a specific ${profile().resource.toLowerCase()} can actually run. Capture both layers before APS interprets an open day as usable capacity.`,
     hint: "Complete all four calendar and capacity dimensions to continue.",
@@ -391,7 +399,7 @@ const steps = [
     },
   },
   {
-    id: "constraint", phase: "Facility", nav: "Constraint view",
+    id: "constraint", phase: () => organizationTerm(), nav: "Constraint view",
     title: "What is currently known about the constraint?",
     sub: "Capture the customer's view as a hypothesis, not as planning truth. The limiting constraint may be unknown or shift by horizon, product mix, campaign, and scenario.",
     hint: "Choose the best current description. It can be refined when data and scenarios reveal more.",
@@ -758,12 +766,14 @@ function renderRail() {
   let html = "";
   let lastPhase = null;
   steps.forEach((s, idx) => {
-    if (s.phase !== lastPhase) { html += `<p class="rail-phase">${escapeHtml(s.phase)}</p>`; lastPhase = s.phase; }
+    const phase = typeof s.phase === "function" ? s.phase() : s.phase;
+    const nav = typeof s.nav === "function" ? s.nav() : s.nav;
+    if (phase !== lastPhase) { html += `<p class="rail-phase">${escapeHtml(phase)}</p>`; lastPhase = phase; }
     const cls = state.done ? "done" : idx === state.i ? "current" : idx < state.i ? "done" : idx <= state.max ? "avail" : "locked";
     const icon = cls === "done" ? "circle-check" : cls === "current" ? "circle-dot" : cls === "locked" ? "lock" : "circle";
     html += `
       <button class="rail-step ${cls}" type="button" data-goto="${idx}" ${idx > state.max && !state.done ? "disabled" : ""}>
-        <i data-lucide="${icon}"></i><span>${escapeHtml(s.nav)}</span>
+        <i data-lucide="${icon}"></i><span>${escapeHtml(nav)}</span>
       </button>`;
   });
   rail.innerHTML = html;
@@ -807,11 +817,12 @@ function render() {
   // title/sub may be functions so they can reflect the live dialect.
   const title = typeof step.title === "function" ? step.title() : step.title;
   const sub = typeof step.sub === "function" ? step.sub() : step.sub;
+  const phase = typeof step.phase === "function" ? step.phase() : step.phase;
   $("#stageCount").textContent = `Step ${state.i + 1} of ${steps.length}`;
   $("#stageBody").dataset.step = step.id;
   $("#stageBody").innerHTML = `
     <div class="step">
-      <p class="step-phase">${escapeHtml(step.phase)}</p>
+      <p class="step-phase">${escapeHtml(phase)}</p>
       <h2>${escapeHtml(title)}</h2>
       <p class="step-sub">${escapeHtml(sub)}</p>
       <div class="step-body">${step.body ? step.body() : ""}</div>
@@ -823,7 +834,8 @@ function render() {
   $("#nextLabel").textContent = step.cta || "Continue";
   const ok = step.gate ? step.gate() : true;
   $("#nextBtn").disabled = !ok;
-  $("#footHint").textContent = ok ? "" : step.hint || "";
+  const hint = typeof step.hint === "function" ? step.hint() : step.hint;
+  $("#footHint").textContent = ok ? "" : hint || "";
 
   refreshIcons();
   save();
