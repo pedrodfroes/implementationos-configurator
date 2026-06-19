@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "PowerShell(Start-Process \"C:\\\\Users\\\\pedro\\\\OneDrive\\\\Documentos\\\\Digital Transformation Configurator\\\\index.html\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\pedro\\\\OneDrive\\\\Documentos\\\\Digital Transformation Configurator\\\\.claude\")",
+      "mcp__Claude_Preview__preview_start",
+      "mcp__visualize__read_me"
+    ]
+  }
+}

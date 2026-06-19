@@ -1,0 +1,648 @@
+// ImplementationOS — guided setup.
+//
+// Philosophy: this is an installer, not a dashboard. One decision per
+// screen, full-bleed, gated. The semantic graph (model.js) is still the
+// single source of truth underneath; every concept that used to be a
+// persistent panel — branching, readiness, the model — is surfaced here
+// as a step or a calm review screen. Nothing is a tab.
+
+const $ = (selector) => document.querySelector(selector);
+const clone = (value) => JSON.parse(JSON.stringify(value));
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+// ── Reference data ───────────────────────────────────────────────────
+const profiles = {
+  jde: { badge: "JDE", name: "JDE / classic work orders", order: "Work order", route: "Routing", resource: "Work center" },
+  sap_pp: { badge: "SAP PP", name: "SAP ECC PP", order: "Production order", route: "Routing", resource: "Work center" },
+  sap_pi: { badge: "SAP PP-PI", name: "SAP ECC PP-PI", order: "Process order", route: "Master recipe", resource: "Resource" },
+  s4: { badge: "S/4HANA", name: "S/4HANA target state", order: "Manufacturing order", route: "Routing or recipe", resource: "Work center" },
+};
+
+// The archetype's manufacturing MODE — not the industry — predicts the
+// dialect. Process plants talk in process orders and recipes; discrete
+// plants in production orders and routings.
+const modeProfiles = {
+  process: { label: "Process manufacturing", erp: "sap_pi", note: "Recipes, phases, batch sizes, and cleaning lead the model." },
+  discrete: { label: "Discrete manufacturing", erp: "sap_pp", note: "Routings, operations, and component availability lead the model." },
+  project: { label: "Project / engineer-to-order", erp: "s4", note: "Project networks, milestones, and long-lead parts lead the model." },
+  service: { label: "Service / capacity", erp: "sap_pp", note: "People, skills, appointments, and locations lead the model." },
+  logistics: { label: "Distribution / logistics", erp: "sap_pp", note: "Networks, lanes, and delivery windows lead the model." },
+};
+
+const planningArchetypes = [
+  { id: "batch-campaign", name: "Batch / Campaign", core: "Made in batches, with cleaning or changeovers between product families.", mode: "process" },
+  { id: "continuous-process", name: "Continuous Process", core: "The line runs continuously; flow balance matters and stopping is costly.", mode: "process" },
+  { id: "discrete-assembly", name: "Discrete Assembly", core: "Finished goods assembled from many components; BOM availability drives feasibility.", mode: "discrete" },
+  { id: "cto-eto", name: "Configure / Engineer to Order", core: "The product is not fully known until the order arrives.", mode: "project" },
+  { id: "job-shop", name: "Job Shop / High-Mix", core: "Many different jobs compete for many different machines.", mode: "discrete" },
+  { id: "flow-shop", name: "Flow Shop / Line", core: "Products move through roughly the same sequence of operations.", mode: "discrete" },
+  { id: "packaging-postponement", name: "Late-Stage Postponement", core: "Bulk made first; final SKU identity happens late.", mode: "process" },
+  { id: "perishable-food", name: "Food with Perishability", core: "Time is a hard constraint; materials and goods degrade.", mode: "process" },
+  { id: "maturation-aging", name: "Maturation / Aging", core: "The product must wait a chemically meaningful time.", mode: "process" },
+  { id: "semiconductor-fab", name: "Semiconductor / Fab", core: "Products revisit the same tools many times in reentrant flows.", mode: "discrete" },
+  { id: "mining-primary", name: "Mining / Primary", core: "Supply is constrained by geology, extraction, and blending.", mode: "logistics" },
+  { id: "distribution-logistics", name: "Distribution / Logistics", core: "The constraint is moving goods through a network, not production.", mode: "logistics" },
+  { id: "field-service", name: "Workforce / Field Service", core: "The critical resource is people with skills, locations, and travel.", mode: "service" },
+  { id: "maintenance-turnaround", name: "Maintenance / Turnaround", core: "Work packages compete for limited downtime windows.", mode: "project" },
+  { id: "construction-project", name: "Construction / Project", core: "The factory is a project site; location and sequence matter.", mode: "project" },
+  { id: "healthcare-capacity", name: "Healthcare / Capacity", core: "Patients flow through constrained resources with uncertain durations.", mode: "service" },
+];
+
+// ── State ────────────────────────────────────────────────────────────
+const initialState = {
+  i: 0,
+  max: 0,
+  archetype: null,
+  erp: "sap_pi",
+  migration: null,
+  planningMode: null,
+  constraint: null,
+  lineDecision: null,
+  variant: null, // null | "active" | "kept" | "reverted" | "skipped"
+  demo: null, // { laneId, score, note }
+  done: false,
+};
+
+let state = clone(initialState);
+const UI_KEY = "implementationos-installer-v1";
+
+function save() {
+  try { localStorage.setItem(UI_KEY, JSON.stringify(state)); } catch {}
+}
+function load() {
+  try {
+    const raw = localStorage.getItem(UI_KEY);
+    if (raw) state = { ...clone(initialState), ...JSON.parse(raw) };
+  } catch { state = clone(initialState); }
+}
+
+// ── Derived helpers (graph is the source of truth) ───────────────────
+function profile() { return profiles[state.erp]; }
+function archetype() { return planningArchetypes.find((a) => a.id === state.archetype) || null; }
+function mode() { return modeProfiles[archetype()?.mode || "process"]; }
+function areas() { return Model.nodesOfType("area").map((n) => ({ id: n.id, ...n.props })); }
+function workcenters() { return Model.nodesOfType("workcenter").map((n) => ({ id: n.id, ...n.props })); }
+function siteName() { return Model.node("site")?.props.name || ""; }
+function areaName(id) { return areas().find((a) => a.id === id)?.name || "Unassigned"; }
+
+function readiness() {
+  let s = 16;
+  if (state.archetype) s += 8;
+  if (siteName()) s += 8;
+  if (state.planningMode) s += 8;
+  if (state.constraint) s += 6;
+  if (state.lineDecision) s += 10;
+  if (state.variant && state.variant !== "active") s += 6;
+  if (state.demo) s += Math.round(state.demo.score * 0.24);
+  if (state.migration) s -= 4;
+  return Math.max(5, Math.min(99, Math.round(s)));
+}
+
+// ── Step definitions ─────────────────────────────────────────────────
+// Each step is one decision. `gate` returns whether Continue unlocks.
+const steps = [
+  {
+    id: "welcome", phase: "Start", nav: "Welcome", cta: "Begin setup",
+    title: "Let's set up your APS pilot.",
+    sub: "A guided, step-by-step build of the implementation model — one decision at a time. Nothing is final; you can go back at any point.",
+    body: () => `
+      <div class="welcome-art" aria-hidden="true">
+        <i data-lucide="route"></i>
+      </div>
+      <ul class="welcome-list">
+        <li><i data-lucide="target"></i><span>Start from the planning archetype, not the industry.</span></li>
+        <li><i data-lucide="git-branch"></i><span>Try changes on a branch before committing them.</span></li>
+        <li><i data-lucide="gauge"></i><span>Watch readiness build as you make each decision.</span></li>
+      </ul>
+    `,
+  },
+  {
+    id: "archetype", phase: "Characterize", nav: "Archetype",
+    title: "What are you implementing?",
+    sub: "Pick the pattern that dominates how work actually flows. It shapes terminology, constraints, and the whole model.",
+    hint: "Choose an archetype to continue.",
+    gate: () => !!state.archetype,
+    body: () => `
+      <div class="pick-grid">
+        ${planningArchetypes
+          .map(
+            (a) => `
+          <button class="pick-card${a.id === state.archetype ? " active" : ""}" type="button" data-arch="${a.id}">
+            <span class="pick-mode">${escapeHtml(modeProfiles[a.mode].label)}</span>
+            <strong>${escapeHtml(a.name)}</strong>
+            <p>${escapeHtml(a.core)}</p>
+          </button>`
+          )
+          .join("")}
+      </div>
+    `,
+    attach: (root) => {
+      root.querySelectorAll("[data-arch]").forEach((b) =>
+        b.addEventListener("click", () => {
+          state.archetype = b.dataset.arch;
+          state.erp = mode().erp;
+          render();
+        })
+      );
+    },
+  },
+  {
+    id: "dialect", phase: "Characterize", nav: "Dialect",
+    title: "Confirm the planning dialect.",
+    sub: "Your archetype is a process or discrete pattern — that decides the ERP language the model speaks. Override if the client's system differs.",
+    body: () => `
+      <div class="derive">
+        <div class="derive-chain">
+          <span class="chain-node">${escapeHtml(archetype()?.name || "—")}</span>
+          <i data-lucide="arrow-right"></i>
+          <span class="chain-node accent">${escapeHtml(mode().label)}</span>
+          <i data-lucide="arrow-right"></i>
+          <span class="chain-node">${escapeHtml(profile().badge)}</span>
+        </div>
+        <p class="derive-note">${escapeHtml(mode().note)}</p>
+        <label class="field big-field">
+          <span>ERP dialect</span>
+          <select id="erpSelect">
+            <option value="jde">JDE / classic work orders</option>
+            <option value="sap_pp">SAP ECC PP</option>
+            <option value="sap_pi">SAP ECC PP-PI</option>
+            <option value="s4">S/4HANA target state</option>
+          </select>
+        </label>
+        <div class="vocab-line">
+          <span>You'll plan</span>
+          <strong>${escapeHtml(profile().order)}s</strong>
+          <em>against</em>
+          <strong>${escapeHtml(profile().route)}s</strong>
+        </div>
+      </div>
+    `,
+    attach: (root) => {
+      const sel = root.querySelector("#erpSelect");
+      sel.value = state.erp;
+      sel.addEventListener("change", (e) => { state.erp = e.target.value; render(); });
+    },
+  },
+  {
+    id: "migration", phase: "Characterize", nav: "Migration",
+    title: "Is an S/4 migration on the roadmap?",
+    sub: "If a migration is coming, the design avoids one-off mappings — and it shows up as a standing risk on your readiness.",
+    hint: "Pick one to continue.",
+    gate: () => state.migration !== null,
+    body: () => `
+      <div class="choice-grid two">
+        ${choiceTile("yes", state.migration === true, "calendar-clock", "Yes, it's coming", "Design for portability; flag the risk")}
+        ${choiceTile("no", state.migration === false, "circle-off", "No, not planned", "Optimize for the current system")}
+      </div>
+    `,
+    attach: (root) => bindChoices(root, (v) => { state.migration = v === "yes"; render(); }),
+  },
+  {
+    id: "site", phase: "Plant", nav: "Plant name",
+    title: "Name the plant.",
+    sub: "This becomes the root of the model — every area, resource, and decision hangs off it.",
+    hint: "Enter a plant name to continue.",
+    gate: () => siteName().trim().length > 0,
+    body: () => `
+      <label class="field big-field solo">
+        <span>Plant name</span>
+        <input id="siteInput" type="text" value="${escapeHtml(siteName())}" placeholder="e.g. Milano Packaging Plant" autocomplete="off" />
+      </label>
+    `,
+    attach: (root) => {
+      const input = root.querySelector("#siteInput");
+      input.focus();
+      input.addEventListener("input", () => {
+        Model.update("site", { name: input.value || "" });
+        refreshGate();
+      });
+    },
+  },
+  {
+    id: "schedule", phase: "Plant", nav: "Schedule mode",
+    title: "How should the pilot schedule?",
+    sub: "One choice now keeps the model honest. You can refine it later.",
+    hint: "Pick a scheduling mode to continue.",
+    gate: () => !!state.planningMode,
+    body: () => `
+      <div class="choice-grid three">
+        ${choiceTile("Finite capacity pilot", state.planningMode === "Finite capacity pilot", "sliders-horizontal", "Finite capacity", "Respect real resource limits")}
+        ${choiceTile("Rough-cut capacity", state.planningMode === "Rough-cut capacity", "bar-chart-3", "Rough-cut", "Fast, approximate load view")}
+        ${choiceTile("Sequencing pilot", state.planningMode === "Sequencing pilot", "arrow-down-up", "Sequencing", "Order operations on the bottleneck")}
+      </div>
+    `,
+    attach: (root) => bindChoices(root, (v) => { state.planningMode = v; render(); }),
+  },
+  {
+    id: "constraint", phase: "Plant", nav: "Bottleneck",
+    title: "Where is the known bottleneck?",
+    sub: "The constraint anchors the demo scenario and the data checks that follow.",
+    hint: "Pick the primary constraint to continue.",
+    gate: () => !!state.constraint,
+    body: () => `
+      <div class="choice-grid three">
+        ${choiceTile("Packaging Line 3", state.constraint === "Packaging Line 3", "alert-triangle", "Packaging Line 3", "Calendar data is incomplete")}
+        ${choiceTile("Mixer A", state.constraint === "Mixer A", "flask-conical", "Mixer A", "Shared across campaigns")}
+        ${choiceTile("QC Release Bench", state.constraint === "QC Release Bench", "microscope", "QC Release Bench", "Release gates the schedule")}
+      </div>
+    `,
+    attach: (root) => bindChoices(root, (v) => { state.constraint = v; render(); }),
+  },
+  {
+    id: "areas", phase: "Model", nav: "Areas",
+    title: "Confirm the operating areas.",
+    sub: "These came from the template. Add anything the plant has that's missing.",
+    gate: () => areas().length > 0,
+    body: () => `
+      <div class="tile-list">
+        ${areas()
+          .map(
+            (a) => `
+          <div class="tile-row">
+            <i data-lucide="layout-grid"></i>
+            <div><strong>${escapeHtml(a.name)}</strong><span>${workcenters().filter((w) => w.areaId === a.id).length} ${escapeHtml(profile().resource.toLowerCase())}s</span></div>
+          </div>`
+          )
+          .join("")}
+      </div>
+      <form class="add-row" id="areaForm">
+        <input id="areaInput" type="text" placeholder="Add an area or department" autocomplete="off" />
+        <button class="ghost-btn" type="submit"><i data-lucide="plus"></i><span>Add</span></button>
+      </form>
+    `,
+    attach: (root) => {
+      root.querySelector("#areaForm").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const name = root.querySelector("#areaInput").value.trim();
+        if (!name) return;
+        const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `area-${Date.now()}`;
+        Model.add({ id, type: "area", props: { name, color: "teal" } }, `${name} added to the site model.`);
+        render();
+      });
+    },
+  },
+  {
+    id: "workcenters", phase: "Model", nav: "Work centers",
+    title: "Place each work center — and settle the data issue.",
+    sub: "One resource came in with a missing calendar. Decide how the pilot handles it before moving on.",
+    hint: "Resolve Packaging Line 3 to continue.",
+    gate: () => !!state.lineDecision,
+    body: () => {
+      const opts = areas().map((a) => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join("");
+      return `
+        <div class="tile-list">
+          ${workcenters()
+            .map((w) => {
+              const issue = w.status === "Data issue";
+              return `
+              <div class="tile-row${issue ? " warn" : ""}">
+                <i data-lucide="${issue ? "alert-triangle" : "cpu"}"></i>
+                <div class="tile-main">
+                  <strong>${escapeHtml(w.name)}</strong>
+                  <span>${escapeHtml(w.capacity)}</span>
+                </div>
+                <select data-wc="${w.id}" class="inline-select">${opts.replace(`value="${w.areaId}"`, `value="${w.areaId}" selected`)}</select>
+              </div>`;
+            })
+            .join("")}
+        </div>
+        <div class="decision-box">
+          <p><i data-lucide="help-circle"></i> Packaging Line 3 has no valid shift calendar in the extract. How should the pilot treat it?</p>
+          <div class="choice-grid two compact">
+            ${choiceTile("flag", state.lineDecision === "flag", "flag", "Flag for cleanup", "Keep it, raise a data task")}
+            ${choiceTile("exclude", state.lineDecision === "exclude", "eye-off", "Exclude from pilot", "Schedule without it for now")}
+          </div>
+        </div>
+      `;
+    },
+    attach: (root) => {
+      root.querySelectorAll("[data-wc]").forEach((sel) =>
+        sel.addEventListener("change", () => {
+          Model.update(sel.dataset.wc, { areaId: sel.value }, null);
+        })
+      );
+      bindChoices(root, (v) => { state.lineDecision = v; render(); });
+    },
+  },
+  {
+    id: "variant", phase: "Model", nav: "Try a variant",
+    title: "Want to try a variant before committing?",
+    sub: "Branching lets you explore a change in isolation. Here: split Packaging into a dedicated Finished-Goods area — see the diff, then keep or revert.",
+    hint: "Try it or skip to continue.",
+    gate: () => state.variant === "kept" || state.variant === "reverted" || state.variant === "skipped",
+    body: () => {
+      if (state.variant === "active") {
+        const { entries } = Model.diff("variant-finished-goods");
+        return `
+          <div class="variant-live">
+            <p class="variant-flag"><i data-lucide="git-branch"></i> On branch <strong>variant-finished-goods</strong> — ${entries.length} change${entries.length === 1 ? "" : "s"}</p>
+            <div class="diff-list">
+              ${entries
+                .map(
+                  (e) => `
+                <div class="diff-item">
+                  <span class="diff-kind ${e.kind}">${e.kind}</span>
+                  <strong>${escapeHtml(e.name)}</strong>
+                  ${e.changes ? e.changes.map((c) => `<span class="diff-pair"><em>${escapeHtml(c.field)}</em> ${escapeHtml(String(c.before ?? "—"))} → <b>${escapeHtml(String(c.after ?? "—"))}</b></span>`).join("") : ""}
+                </div>`
+                )
+                .join("") || '<p class="muted">No changes recorded.</p>'}
+            </div>
+            <div class="variant-actions">
+              <button class="cta solid" id="keepVariant" type="button"><i data-lucide="git-merge"></i><span>Keep variant</span></button>
+              <button class="ghost-btn" id="revertVariant" type="button"><i data-lucide="undo-2"></i><span>Revert</span></button>
+            </div>
+          </div>
+        `;
+      }
+      if (state.variant === "kept" || state.variant === "reverted") {
+        const kept = state.variant === "kept";
+        return `
+          <div class="variant-outcome ${kept ? "kept" : "reverted"}">
+            <i data-lucide="${kept ? "git-merge" : "undo-2"}"></i>
+            <strong>${kept ? "Variant kept" : "Variant reverted"}</strong>
+            <p>${kept ? "Packaging is now Finished Goods on the baseline — the merge is recorded as a governed decision." : "The baseline is unchanged. The branch was discarded."}</p>
+          </div>
+        `;
+      }
+      return `
+        <div class="choice-grid two">
+          ${choiceTile("try", false, "git-branch", "Try a variant", "Fork, change, review the diff")}
+          ${choiceTile("skip", state.variant === "skipped", "arrow-right", "Skip for now", "Keep the baseline as-is")}
+        </div>
+      `;
+    },
+    attach: (root) => {
+      root.querySelector("#keepVariant")?.addEventListener("click", () => {
+        Model.merge("variant-finished-goods", { approver: "You", rationale: "Adopted Finished-Goods naming for go-live." });
+        state.variant = "kept";
+        render();
+      });
+      root.querySelector("#revertVariant")?.addEventListener("click", () => {
+        Model.discardBranch("variant-finished-goods");
+        state.variant = "reverted";
+        render();
+      });
+      bindChoices(root, (v) => {
+        if (v === "skip") { state.variant = "skipped"; render(); return; }
+        if (v === "try") {
+          if (Model.branch() !== "main") Model.checkout("main");
+          Model.createBranch("variant-finished-goods");
+          Model.commit({ label: "Renamed Packaging to Finished Goods on a variant branch.", ops: [{ op: "update", id: "packaging", props: { name: "Finished Goods", renamed: true } }] });
+          state.variant = "active";
+          render();
+        }
+      });
+    },
+  },
+  {
+    id: "demo", phase: "Validate", nav: "Demo",
+    title: "Schedule the rush order.",
+    sub: () => `A rush ${profile().order.toLowerCase()} is due today and needs a packaging line. Pick where it runs — the model scores the choice.`,
+    hint: "Schedule the order to continue.",
+    gate: () => !!state.demo,
+    body: () => {
+      const lanes = [
+        ["wc-pack-3", "Packaging Line 3", "Preferred line, but calendar data is incomplete."],
+        ["wc-pack-2", "Packaging Line 2", "Alternate line with available capacity."],
+        ["wc-qc-1", "QC Release Bench", "Wrong capability for packaging operations."],
+      ];
+      return `
+        ${state.demo ? `<div class="demo-result"><strong>${state.demo.score}% — training scored</strong><p>${escapeHtml(state.demo.note)}</p></div>` : ""}
+        <div class="lane-list">
+          ${lanes
+            .map(
+              ([id, name, note]) => `
+            <button class="lane${state.demo?.laneId === id ? " picked" : ""}" type="button" data-lane="${id}">
+              <strong>${escapeHtml(name)}</strong>
+              <span>${escapeHtml(note)}</span>
+            </button>`
+            )
+            .join("")}
+        </div>
+      `;
+    },
+    attach: (root) => {
+      root.querySelectorAll("[data-lane]").forEach((b) =>
+        b.addEventListener("click", () => { scoreDemo(b.dataset.lane); })
+      );
+    },
+  },
+  {
+    id: "readiness", phase: "Validate", nav: "Readiness",
+    title: "Your readiness so far.",
+    sub: "Computed from every decision you've made — model completeness, the data issue, and the demo evidence.",
+    body: () => {
+      const r = readiness();
+      const rows = [
+        ["Plant model", siteName() ? "done" : "open", siteName() ? `${siteName()} · ${areas().length} areas` : "Not named"],
+        ["Scheduling", state.planningMode ? "done" : "open", state.planningMode || "Not chosen"],
+        ["Work centers", state.lineDecision ? "done" : "open", state.lineDecision === "flag" ? "Line 3 flagged for cleanup" : state.lineDecision === "exclude" ? "Line 3 excluded" : "Unresolved"],
+        ["Demo evidence", state.demo ? "done" : "open", state.demo ? `${state.demo.score}% training score` : "Pending"],
+        ["Migration risk", "info", state.migration ? "S/4 migration on roadmap" : "No migration planned"],
+      ];
+      return `
+        <div class="readiness-hero">
+          <div class="ring" style="--p:${r}">
+            <span>${r}<small>%</small></span>
+          </div>
+          <div class="readiness-lines">
+            ${rows
+              .map(
+                ([label, st, detail]) => `
+              <div class="rline">
+                <i data-lucide="${st === "done" ? "circle-check" : st === "info" ? "info" : "circle-dashed"}" class="ic-${st}"></i>
+                <strong>${escapeHtml(label)}</strong>
+                <span>${escapeHtml(detail)}</span>
+              </div>`
+              )
+              .join("")}
+          </div>
+        </div>
+      `;
+    },
+  },
+  {
+    id: "handoff", phase: "Handoff", nav: "Handoff", cta: "Finish setup",
+    title: "Hand off to the support organization.",
+    sub: "The journey ends where support begins. This exports the model, decisions, and evidence — managed services are out of scope.",
+    body: () => {
+      const decisions = Model.nodesOfType("decision");
+      return `
+        <div class="summary-grid">
+          <div class="summary-card"><span>Model</span><strong>${areas().length} areas · ${workcenters().length} ${escapeHtml(profile().resource.toLowerCase())}s</strong><small>${Model.events().length} committed events</small></div>
+          <div class="summary-card"><span>Decisions</span><strong>${decisions.length} governed</strong><small>${decisions.length ? "merge history travels with handoff" : "no branch merges"}</small></div>
+          <div class="summary-card"><span>Evidence</span><strong>${state.demo ? state.demo.score + "% training" : "Pending"}</strong><small>${state.demo ? "seeds the support runbook" : "no scored scenario"}</small></div>
+          <div class="summary-card"><span>Readiness</span><strong>${readiness()}%</strong><small>at handoff</small></div>
+        </div>
+        <button class="ghost-btn wide" id="exportBtn" type="button"><i data-lucide="download"></i><span>Export handoff brief (JSON)</span></button>
+      `;
+    },
+    attach: (root) => {
+      root.querySelector("#exportBtn").addEventListener("click", exportBrief);
+    },
+  },
+];
+
+// ── Step UI helpers ──────────────────────────────────────────────────
+function choiceTile(value, active, icon, title, sub) {
+  return `
+    <button class="choice${active ? " active" : ""}" type="button" data-choice="${escapeHtml(value)}">
+      <i data-lucide="${icon}"></i>
+      <strong>${escapeHtml(title)}</strong>
+      <span>${escapeHtml(sub)}</span>
+    </button>
+  `;
+}
+function bindChoices(root, fn) {
+  root.querySelectorAll("[data-choice]").forEach((b) =>
+    b.addEventListener("click", () => fn(b.dataset.choice))
+  );
+}
+
+function scoreDemo(laneId) {
+  let r;
+  if (laneId === "wc-pack-2") r = { score: 92, note: "Packaging Line 2 is a valid alternate, and the model keeps the Line 3 calendar issue open for data cleanup." };
+  else if (laneId === "wc-pack-3") r = { score: 54, note: "Line 3 still has an unresolved calendar issue — it shouldn't run the rush order." };
+  else r = { score: 28, note: "That resource doesn't perform packaging operations. The miss links to training and role readiness." };
+  state.demo = { laneId, ...r };
+  render();
+}
+
+// ── Render ───────────────────────────────────────────────────────────
+function refreshIcons() {
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function refreshGate() {
+  const step = steps[state.i];
+  $("#nextBtn").disabled = step.gate ? !step.gate() : false;
+}
+
+function renderRail() {
+  const rail = $("#railSteps");
+  let html = "";
+  let lastPhase = null;
+  steps.forEach((s, idx) => {
+    if (s.phase !== lastPhase) { html += `<p class="rail-phase">${escapeHtml(s.phase)}</p>`; lastPhase = s.phase; }
+    const cls = state.done ? "done" : idx === state.i ? "current" : idx < state.i ? "done" : idx <= state.max ? "avail" : "locked";
+    const icon = cls === "done" ? "circle-check" : cls === "current" ? "circle-dot" : cls === "locked" ? "lock" : "circle";
+    html += `
+      <button class="rail-step ${cls}" type="button" data-goto="${idx}" ${idx > state.max && !state.done ? "disabled" : ""}>
+        <i data-lucide="${icon}"></i><span>${escapeHtml(s.nav)}</span>
+      </button>`;
+  });
+  rail.innerHTML = html;
+  rail.querySelectorAll("[data-goto]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const idx = Number(b.dataset.goto);
+      if (idx <= state.max) { state.i = idx; state.done = false; render(); }
+    })
+  );
+
+  const r = readiness();
+  $("#railReadiness").innerHTML = `
+    <div class="mini-ring" style="--p:${r}"><span>${r}%</span></div>
+    <div><p class="mini-label">Readiness</p><p class="mini-sub">builds as you decide</p></div>
+  `;
+}
+
+function renderCompletion() {
+  $("#stageCount").textContent = "Complete";
+  $("#stageBody").innerHTML = `
+    <div class="complete">
+      <div class="complete-mark"><i data-lucide="check"></i></div>
+      <h2>Setup complete.</h2>
+      <p>${escapeHtml(siteName())} is modelled, validated at ${readiness()}% readiness, and ready to hand off. You can revisit any step from the rail.</p>
+      <button class="cta" id="reviewBtn" type="button"><i data-lucide="list-checks"></i><span>Review readiness</span></button>
+    </div>
+  `;
+  $("#stageFoot").style.display = "none";
+  $("#stageBody").querySelector("#reviewBtn").addEventListener("click", () => {
+    state.done = false; state.i = steps.findIndex((s) => s.id === "readiness"); render();
+  });
+  refreshIcons();
+}
+
+function render() {
+  if (state.done) { renderRail(); renderCompletion(); save(); return; }
+  $("#stageFoot").style.display = "";
+  const step = steps[state.i];
+  renderRail();
+
+  // title/sub may be functions so they can reflect the live dialect.
+  const title = typeof step.title === "function" ? step.title() : step.title;
+  const sub = typeof step.sub === "function" ? step.sub() : step.sub;
+  $("#stageCount").textContent = `Step ${state.i + 1} of ${steps.length}`;
+  $("#stageBody").innerHTML = `
+    <div class="step">
+      <p class="step-phase">${escapeHtml(step.phase)}</p>
+      <h2>${escapeHtml(title)}</h2>
+      <p class="step-sub">${escapeHtml(sub)}</p>
+      <div class="step-body">${step.body ? step.body() : ""}</div>
+    </div>
+  `;
+  step.attach?.($("#stageBody"));
+
+  $("#backBtn").disabled = state.i === 0;
+  $("#nextLabel").textContent = step.cta || "Continue";
+  const ok = step.gate ? step.gate() : true;
+  $("#nextBtn").disabled = !ok;
+  $("#footHint").textContent = ok ? "" : step.hint || "";
+
+  refreshIcons();
+  save();
+}
+
+function advance() {
+  const step = steps[state.i];
+  if (step.gate && !step.gate()) return;
+  if (state.i >= steps.length - 1) { state.done = true; render(); return; }
+  state.i += 1;
+  state.max = Math.max(state.max, state.i);
+  render();
+}
+
+function exportBrief() {
+  const brief = {
+    product: "ImplementationOS for Manufacturing Software",
+    archetype: archetype()?.name,
+    mode: mode().label,
+    dialect: profile().badge,
+    site: siteName(),
+    areas: areas().map((a) => a.name),
+    workcenters: workcenters().map((w) => ({ name: w.name, area: areaName(w.areaId) })),
+    decisions: { lineIssue: state.lineDecision, variant: state.variant, migration: state.migration },
+    demo: state.demo,
+    readiness: `${readiness()}%`,
+    governedDecisions: Model.nodesOfType("decision").map((d) => d.props),
+  };
+  const blob = new Blob([JSON.stringify(brief, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "implementationos-handoff-brief.json";
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  load();
+  $("#nextBtn").addEventListener("click", advance);
+  $("#backBtn").addEventListener("click", () => { if (state.i > 0) { state.i -= 1; render(); } });
+  $("#restartBtn").addEventListener("click", () => {
+    state = clone(initialState);
+    try { localStorage.removeItem(UI_KEY); } catch {}
+    Model.reset();
+    render();
+  });
+  render();
+});

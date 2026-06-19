@@ -1,0 +1,7 @@
+.preview-server*.log
+node_modules/
+dist/
+.DS_Store
+Thumbs.db
+*.tmp
+*.bak

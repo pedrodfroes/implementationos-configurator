@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ImplementationOS — Guided Setup</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+    <script src="./packs.js" defer></script>
+    <script src="./model.js" defer></script>
+    <script src="./app.js" defer></script>
+  </head>
+  <body class="installer-body">
+    <main class="installer" id="installer">
+      <aside class="rail" aria-label="Setup progress">
+        <div class="rail-brand">
+          <p class="eyebrow">ImplementationOS</p>
+          <strong>APS pilot setup</strong>
+        </div>
+        <nav class="rail-steps" id="railSteps" aria-label="Steps"></nav>
+        <div class="rail-foot">
+          <div class="rail-readiness" id="railReadiness"></div>
+        </div>
+      </aside>
+
+      <section class="stage-wrap">
+        <header class="stage-top">
+          <span class="stage-count" id="stageCount"></span>
+          <button class="ghost-btn" id="restartBtn" type="button" title="Start over">
+            <i data-lucide="rotate-ccw"></i>
+            <span>Start over</span>
+          </button>
+        </header>
+
+        <div class="stage-body" id="stageBody" aria-live="polite"></div>
+
+        <footer class="stage-foot" id="stageFoot">
+          <button class="ghost-btn" id="backBtn" type="button">
+            <i data-lucide="arrow-left"></i>
+            <span>Back</span>
+          </button>
+          <div class="foot-right">
+            <span class="foot-hint" id="footHint"></span>
+            <button class="cta" id="nextBtn" type="button">
+              <span id="nextLabel">Continue</span>
+              <i data-lucide="arrow-right"></i>
+            </button>
+          </div>
+        </footer>
+      </section>
+    </main>
+  </body>
+</html>
