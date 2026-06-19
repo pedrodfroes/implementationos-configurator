@@ -74,6 +74,25 @@ const planningArchetypes = [
   { id: "healthcare-capacity", name: "Healthcare / Capacity", core: "Patients flow through constrained resources with uncertain durations.", mode: "service" },
 ];
 
+const archetypeIcons = {
+  "batch-campaign": "flask-conical",
+  "continuous-process": "waves",
+  "discrete-assembly": "boxes",
+  "cto-eto": "pencil-ruler",
+  "job-shop": "shuffle",
+  "flow-shop": "workflow",
+  "packaging-postponement": "package-open",
+  "perishable-food": "apple",
+  "maturation-aging": "hourglass",
+  "semiconductor-fab": "microchip",
+  "mining-primary": "mountain",
+  "distribution-logistics": "truck",
+  "field-service": "users",
+  "maintenance-turnaround": "wrench",
+  "construction-project": "hard-hat",
+  "healthcare-capacity": "hospital",
+};
+
 const planningLevels = [
   { id: "strategic", level: "Strategic / network planning", horizon: "Years", question: "Where should we make, source, add capacity, or change the footprint?", terms: "Network design · footprint planning · capacity strategy" },
   { id: "sop", level: "Sales & Operations Planning", horizon: "12–24 months", question: "Can demand, supply, inventory, and finance agree on one feasible plan?", terms: "S&OP · IBP · aggregate planning" },
@@ -90,7 +109,7 @@ const initialState = {
   i: 0,
   max: 0,
   scope: null,
-  archetype: null,
+  archetypes: [],
   erp: "sap_pi",
   migration: null,
   calendar: {
@@ -126,6 +145,7 @@ function load() {
     if (raw) {
       const saved = JSON.parse(raw);
       state = { ...clone(initialState), ...saved };
+      if (!Array.isArray(saved.archetypes) && saved.archetype) state.archetypes = [saved.archetype];
       if (!("scope" in saved)) {
         state.i = 1;
         state.max = Math.max(1, Number(saved.max || 0));
@@ -134,6 +154,7 @@ function load() {
         if (state.max > 6) state.max -= 1;
       }
       delete state.planningMode;
+      delete state.archetype;
     }
   } catch { state = clone(initialState); }
 }
@@ -152,8 +173,33 @@ function calendarProfile() {
   if (["sap_pp", "sap_pi", "s4"].includes(state.erp)) return calendarProfiles.sap;
   return calendarProfiles[state.erp] || calendarProfiles.generic;
 }
-function archetype() { return planningArchetypes.find((a) => a.id === state.archetype) || null; }
-function mode() { return modeProfiles[archetype()?.mode || "process"]; }
+function selectedArchetypes() {
+  return (state.archetypes || []).map((id) => planningArchetypes.find((item) => item.id === id)).filter(Boolean);
+}
+function modeMix() {
+  const selected = selectedArchetypes();
+  const counts = {};
+  selected.forEach((item) => { counts[item.mode] = (counts[item.mode] || 0) + 1; });
+  let dominant = selected[0]?.mode || "process";
+  selected.forEach((item) => {
+    if ((counts[item.mode] || 0) > (counts[dominant] || 0)) dominant = item.mode;
+  });
+  return { dominant, overlays: Object.keys(counts).filter((key) => key !== dominant), counts };
+}
+function mode() { return modeProfiles[modeMix().dominant]; }
+function archetypeSynthesis() {
+  const selected = selectedArchetypes();
+  const mix = modeMix();
+  if (!selected.length) return { title: "No operating pattern selected", detail: "Choose every pattern that materially shapes planning.", count: 0 };
+  if (selected.length === 1) return { title: selected[0].name, detail: modeProfiles[selected[0].mode].note, count: 1 };
+  const dominant = modeProfiles[mix.dominant].label;
+  const overlays = mix.overlays.map((key) => modeProfiles[key].label).join(", ");
+  return {
+    title: overlays ? `${dominant} backbone with ${overlays} overlay` : `${dominant} composite`,
+    detail: overlays ? `The ${dominant.toLowerCase()} model drives terminology; secondary constraints remain explicit downstream.` : `${selected.length} compatible patterns are synthesized inside one ${dominant.toLowerCase()} model.`,
+    count: selected.length,
+  };
+}
 function areas() { return Model.nodesOfType("area").map((n) => ({ id: n.id, ...n.props })); }
 function workcenters() { return Model.nodesOfType("workcenter").map((n) => ({ id: n.id, ...n.props })); }
 function siteName() { return Model.node("site")?.props.name || ""; }
@@ -162,7 +208,7 @@ function areaName(id) { return areas().find((a) => a.id === id)?.name || "Unassi
 function readiness() {
   let s = 16;
   if (state.scope) s += 12;
-  if (state.archetype) s += 8;
+  if (state.archetypes?.length) s += 8;
   if (siteName()) s += 8;
   if (state.calendar?.layering && state.calendar?.pattern && state.calendar?.exceptions && state.calendar?.modifiersConfirmed) s += 8;
   if (state.constraint) s += 6;
@@ -225,27 +271,37 @@ const steps = [
   {
     id: "archetype", phase: "Characterize", nav: "Archetype",
     title: "What are you implementing?",
-    sub: "Pick the pattern that dominates how work actually flows. It shapes terminology, constraints, and the whole model.",
-    hint: "Choose an archetype to continue.",
-    gate: () => !!state.archetype,
-    body: () => `
-      <div class="pick-grid">
+    sub: "Select every pattern that materially shapes the operation. The model will synthesize a planning backbone without erasing secondary behavior.",
+    hint: "Choose at least one archetype to continue.",
+    gate: () => state.archetypes?.length > 0,
+    body: () => {
+      const synthesis = archetypeSynthesis();
+      return `
+      <div class="archetype-synthesis${synthesis.count ? " populated" : ""}">
+        <i data-lucide="layers-3"></i>
+        <div><strong>${escapeHtml(synthesis.title)}</strong><p>${escapeHtml(synthesis.detail)}</p></div>
+        <span>${synthesis.count} selected</span>
+      </div>
+      <div class="pick-grid" aria-label="Manufacturing archetypes">
         ${planningArchetypes
           .map(
             (a) => `
-          <button class="pick-card${a.id === state.archetype ? " active" : ""}" type="button" data-arch="${a.id}">
-            <span class="pick-mode">${escapeHtml(modeProfiles[a.mode].label)}</span>
+          <button class="pick-card${state.archetypes.includes(a.id) ? " active" : ""}" type="button" data-arch="${a.id}" data-mode="${a.mode}" aria-pressed="${state.archetypes.includes(a.id)}">
+            <span class="pick-head"><i data-lucide="${archetypeIcons[a.id]}"></i><span class="pick-mode">${escapeHtml(modeProfiles[a.mode].label)}</span></span>
             <strong>${escapeHtml(a.name)}</strong>
             <p>${escapeHtml(a.core)}</p>
           </button>`
           )
           .join("")}
       </div>
-    `,
+    `;
+    },
     attach: (root) => {
       root.querySelectorAll("[data-arch]").forEach((b) =>
         b.addEventListener("click", () => {
-          state.archetype = b.dataset.arch;
+          const selected = new Set(state.archetypes);
+          selected.has(b.dataset.arch) ? selected.delete(b.dataset.arch) : selected.add(b.dataset.arch);
+          state.archetypes = [...selected];
           state.erp = mode().erp;
           render();
         })
@@ -255,11 +311,11 @@ const steps = [
   {
     id: "dialect", phase: "Characterize", nav: "Dialect",
     title: "Confirm the planning dialect.",
-    sub: "Your archetype is a process or discrete pattern — that decides the ERP language the model speaks. Override if the client's system differs.",
+    sub: "The synthesized operating backbone recommends the planning language. Secondary archetypes remain overlays; override the ERP dialect if the client's system differs.",
     body: () => `
       <div class="derive">
         <div class="derive-chain">
-          <span class="chain-node">${escapeHtml(archetype()?.name || "—")}</span>
+          <span class="chain-node">${escapeHtml(archetypeSynthesis().count === 1 ? archetypeSynthesis().title : `${archetypeSynthesis().count} reconciled patterns`)}</span>
           <i data-lucide="arrow-right"></i>
           <span class="chain-node accent">${escapeHtml(mode().label)}</span>
           <i data-lucide="arrow-right"></i>
@@ -854,7 +910,8 @@ function exportBrief() {
   const brief = {
     product: "ImplementationOS for Manufacturing Software",
     planningObjective: planningLevels.find((item) => item.id === state.scope) || null,
-    archetype: archetype()?.name,
+    archetypes: selectedArchetypes().map(({ id, name, mode: archetypeMode }) => ({ id, name, mode: archetypeMode })),
+    archetypeSynthesis: { ...archetypeSynthesis(), ...modeMix(), dominantLabel: mode().label },
     mode: mode().label,
     dialect: profile().badge,
     terminology: {
