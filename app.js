@@ -108,6 +108,28 @@ const industries = [
   { id: "building-materials", name: "Building Materials", group: "Process industries", icon: "brick-wall", focus: "Kilns, campaigns, bulk logistics, energy-intensive assets", compliance: "Quality certificates · emissions · batch traceability" },
 ];
 
+const departmentTaxonomy = [
+  { id: "production", name: "Production / Processing", icon: "factory", note: "Core conversion, processing, or assembly activities" },
+  { id: "packaging", name: "Packaging / Finishing", icon: "package-check", note: "Packing, labeling, finishing, and late-stage differentiation" },
+  { id: "quality", name: "Quality / Laboratory", icon: "microscope", note: "Testing, sampling, inspection, and release capacity" },
+  { id: "warehouse", name: "Warehouse / Intralogistics", icon: "warehouse", note: "Storage, staging, dispensing, picking, and internal movement" },
+  { id: "maintenance", name: "Maintenance / Reliability", icon: "wrench", note: "Planned maintenance, repair, calibration, and reliability work" },
+  { id: "utilities", name: "Utilities / Site Services", icon: "zap", note: "Shared utilities, clean media, energy, and environmental services" },
+  { id: "planning", name: "Planning / Production Control", icon: "calendar-range", note: "Scheduling, release, coordination, and production control" },
+  { id: "external", name: "External / Subcontracting", icon: "external-link", note: "Third-party processing, testing, or contract manufacturing" },
+];
+
+const resourceTaxonomy = [
+  { id: "processing-equipment", name: "Processing equipment", icon: "cog", department: "production", note: "Machines, vessels, reactors, or processing units" },
+  { id: "lines-cells", name: "Lines / cells", icon: "workflow", department: "packaging", note: "Packaging, assembly, filling, or production lines" },
+  { id: "labor-crews", name: "Labor / crews", icon: "users", department: "production", note: "People, teams, skills, and shift-based capacity" },
+  { id: "quality-capacity", name: "Quality / lab capacity", icon: "test-tube-2", department: "quality", note: "Benches, instruments, analysts, and release capacity" },
+  { id: "tools-fixtures", name: "Tools / fixtures", icon: "hammer", department: "production", note: "Shared tooling, molds, dies, fixtures, and setup kits" },
+  { id: "material-handling", name: "Storage / material handling", icon: "forklift", department: "warehouse", note: "Locations, tanks, staging lanes, and handling equipment" },
+  { id: "utility-capacity", name: "Utility capacity", icon: "gauge", department: "utilities", note: "Power, steam, clean media, air, water, or environmental limits" },
+  { id: "external-capacity", name: "External capacity", icon: "building-2", department: "external", note: "Suppliers, subcontractors, tollers, and external laboratories" },
+];
+
 const planningLevels = [
   { id: "strategic", level: "Strategic / network planning", horizon: "Years", question: "Where should we make, source, add capacity, or change the footprint?", terms: "Network design · footprint planning · capacity strategy" },
   { id: "sop", level: "Sales & Operations Planning", horizon: "12–24 months", question: "Can demand, supply, inventory, and finance agree on one feasible plan?", terms: "S&OP · IBP · aggregate planning" },
@@ -136,7 +158,9 @@ const initialState = {
     modifiersConfirmed: false,
   },
   constraint: null,
-  lineDecision: null,
+  taxonomyMode: "representative",
+  departmentTypes: [],
+  resourceTypes: [],
   bom: {
     structure: null,
     features: [],
@@ -186,6 +210,14 @@ function load() {
         state.i = 12;
         state.max = Math.max(12, state.max + 1);
       }
+      if (!("taxonomyMode" in saved)) {
+        if (state.i > 6) state.i -= 1;
+        if (state.max > 6) state.max -= 1;
+        if (Number(saved.max || 0) >= 9) state.i = 8;
+        state.departmentTypes = [];
+        state.resourceTypes = [];
+      }
+      delete state.lineDecision;
     }
   } catch { state = clone(initialState); }
 }
@@ -211,6 +243,30 @@ function industry() { return industries.find((item) => item.id === state.industr
 function executionSourceLabel() {
   return { erp: `${profile().badge} confirmations`, mes: "MES execution events", hybrid: `Hybrid MES + ${profile().badge}` }[state.execution?.source] || "Not configured";
 }
+function selectedDepartmentTypes() { return departmentTaxonomy.filter((item) => state.departmentTypes?.includes(item.id)); }
+function selectedResourceTypes() { return resourceTaxonomy.filter((item) => state.resourceTypes?.includes(item.id)); }
+function representativeData() {
+  const departments = selectedDepartmentTypes().map((item, index) => ({
+    id: `DEPT-${String(index + 1).padStart(3, "0")}`,
+    name: `${item.name} 01`,
+    taxonomyType: item.id,
+    synthetic: true,
+  }));
+  const resources = selectedResourceTypes().map((item, index) => ({
+    id: `RES-${String(index + 1).padStart(3, "0")}`,
+    name: `${item.name} 01`,
+    taxonomyType: item.id,
+    departmentId: departments.find((department) => department.taxonomyType === item.department)?.id || null,
+    relationshipStatus: departments.some((department) => department.taxonomyType === item.department) ? "mapped by taxonomy" : "left unassigned for customer mapping",
+    synthetic: true,
+  }));
+  return {
+    replacementPolicy: "Representative synthetic records; replace with governed customer master data during onboarding.",
+    organization: { id: "ORG-001", name: `Demo ${organizationTerm()} 01`, type: profile().facility, synthetic: true },
+    departments,
+    resources,
+  };
+}
 function modeMix() {
   const selected = selectedArchetypes();
   const counts = {};
@@ -235,20 +291,15 @@ function archetypeSynthesis() {
     count: selected.length,
   };
 }
-function areas() { return Model.nodesOfType("area").map((n) => ({ id: n.id, ...n.props })); }
-function workcenters() { return Model.nodesOfType("workcenter").map((n) => ({ id: n.id, ...n.props })); }
-function siteName() { return Model.node("site")?.props.name || ""; }
-function areaName(id) { return areas().find((a) => a.id === id)?.name || "Unassigned"; }
-
 function readiness() {
   let s = 16;
   if (state.scope) s += 12;
   if (state.archetypes?.length) s += 8;
   if (state.industry) s += 6;
-  if (siteName()) s += 8;
+  if (state.departmentTypes?.length) s += 8;
   if (state.calendar?.layering && state.calendar?.pattern && state.calendar?.exceptions && state.calendar?.modifiersConfirmed) s += 8;
   if (state.constraint) s += 6;
-  if (state.lineDecision) s += 10;
+  if (state.resourceTypes?.length) s += 10;
   if (state.bom?.structure && state.bom?.featuresConfirmed && state.bom?.consumption && state.bom?.source) s += 8;
   if (state.execution?.source && state.execution?.levels?.length && state.execution?.events?.length && state.execution?.quantitiesConfirmed) s += 8;
   if (state.variant && state.variant !== "active") s += 6;
@@ -435,27 +486,6 @@ const steps = [
     attach: (root) => bindChoices(root, (v) => { state.migration = v === "yes"; render(); }),
   },
   {
-    id: "site", phase: () => organizationTerm(), nav: () => `${organizationTerm()} name`,
-    title: () => `Name the ${profile().facility.toLowerCase()}.`,
-    sub: () => `In ${profile().badge}, this is the ${profile().facility}. Every ${profile().area.toLowerCase()}, ${profile().resource.toLowerCase()}, storage object, and decision hangs off it.`,
-    hint: () => `Enter the ${organizationTerm().toLowerCase()} name to continue.`,
-    gate: () => siteName().trim().length > 0,
-    body: () => `
-      <label class="field big-field solo">
-        <span>${escapeHtml(profile().facility)} name</span>
-        <input id="siteInput" type="text" value="${escapeHtml(siteName())}" placeholder="e.g. Milano Packaging" autocomplete="off" />
-      </label>
-    `,
-    attach: (root) => {
-      const input = root.querySelector("#siteInput");
-      input.focus();
-      input.addEventListener("input", () => {
-        Model.update("site", { name: input.value || "" });
-        refreshGate();
-      });
-    },
-  },
-  {
     id: "calendar", phase: () => organizationTerm(), nav: "Calendars & capacity",
     title: "Where does available capacity really come from?",
     sub: () => `${calendarProfile().base} defines broad working days; ${calendarProfile().resource} determines whether a specific ${profile().resource.toLowerCase()} can actually run. Capture both layers before APS interprets an open day as usable capacity.`,
@@ -535,87 +565,63 @@ const steps = [
       <div class="choice-grid three">
         ${choiceTile("unknown", state.constraint === "unknown", "circle-help", "Not known yet", "Let data profiling and scenario runs surface likely constraints")}
         ${choiceTile("shifting", state.constraint === "shifting", "shuffle", "Shifting constraint", "Changes with horizon, product mix, campaign, or operating conditions")}
-        ${choiceTile("Packaging Line 3", state.constraint === "Packaging Line 3", "alert-triangle", "Packaging Line 3", "Customer-observed candidate; calendar data is incomplete")}
-        ${choiceTile("Mixer A", state.constraint === "Mixer A", "flask-conical", "Mixer A", "Customer-observed candidate; shared across campaigns")}
-        ${choiceTile("QC Release Bench", state.constraint === "QC Release Bench", "microscope", "QC Release Bench", "Customer-observed candidate; release may gate the schedule")}
+        ${choiceTile("equipment-family", state.constraint === "equipment-family", "cog", "Equipment family", "Customer-observed capacity pattern; representative resources will illustrate it")}
+        ${choiceTile("shared-stage", state.constraint === "shared-stage", "workflow", "Shared processing stage", "A shared stage may constrain multiple products or campaigns")}
+        ${choiceTile("quality-release", state.constraint === "quality-release", "microscope", "Quality release", "Inspection, testing, or release capacity may gate the schedule")}
       </div>
     `,
     attach: (root) => bindChoices(root, (v) => { state.constraint = v; render(); }),
   },
   {
-    id: "areas", phase: "Model", nav: "Areas",
-    title: "Confirm the operating areas.",
-    sub: () => `These came from the template. Add any ${profile().area.toLowerCase()} or operating area the ${profile().facility.toLowerCase()} is missing.`,
-    gate: () => areas().length > 0,
+    id: "areas", phase: "Model", nav: "Department taxonomy",
+    title: () => `Which ${profile().area.toLowerCase()} types belong in the representative model?`,
+    sub: "Select semantic categories, not customer department names. The generator will create synthetic examples that preserve these roles and relationships.",
+    hint: "Select at least one department type to continue.",
+    gate: () => state.departmentTypes?.length > 0,
     body: () => `
-      <div class="tile-list">
-        ${areas()
-          .map(
-            (a) => `
-          <div class="tile-row">
-            <i data-lucide="layout-grid"></i>
-            <div><strong>${escapeHtml(a.name)}</strong><span>${workcenters().filter((w) => w.areaId === a.id).length} ${escapeHtml(profile().resource.toLowerCase())}s</span></div>
-          </div>`
-          )
-          .join("")}
+      <div class="taxonomy-grid">
+        ${departmentTaxonomy.map((item) => `
+          <button class="taxonomy-card${state.departmentTypes.includes(item.id) ? " active" : ""}" type="button" data-department-type="${item.id}" aria-pressed="${state.departmentTypes.includes(item.id)}">
+            <i data-lucide="${item.icon}"></i>
+            <span><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.note)}</small></span>
+          </button>
+        `).join("")}
       </div>
-      <form class="add-row" id="areaForm">
-        <input id="areaInput" type="text" placeholder="Add an area or department" autocomplete="off" />
-        <button class="ghost-btn" type="submit"><i data-lucide="plus"></i><span>Add</span></button>
-      </form>
+      <p class="representative-note"><i data-lucide="sparkles"></i> ${state.departmentTypes.length || "No"} department type${state.departmentTypes.length === 1 ? "" : "s"} will seed representative records.</p>
     `,
     attach: (root) => {
-      root.querySelector("#areaForm").addEventListener("submit", (e) => {
-        e.preventDefault();
-        const name = root.querySelector("#areaInput").value.trim();
-        if (!name) return;
-        const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `area-${Date.now()}`;
-        Model.add({ id, type: "area", props: { name, color: "teal" } }, `${name} added to the ${profile().facility.toLowerCase()} model.`);
+      root.querySelectorAll("[data-department-type]").forEach((button) => button.addEventListener("click", () => {
+        const selected = new Set(state.departmentTypes);
+        selected.has(button.dataset.departmentType) ? selected.delete(button.dataset.departmentType) : selected.add(button.dataset.departmentType);
+        state.departmentTypes = [...selected];
         render();
-      });
+      }));
     },
   },
   {
-    id: "workcenters", phase: "Model", nav: "Resources",
-    title: () => `Place each ${profile().resource.toLowerCase()} — and settle the data issue.`,
-    sub: "One resource came in with a missing calendar. Decide how the pilot handles it before moving on.",
-    hint: "Resolve Packaging Line 3 to continue.",
-    gate: () => !!state.lineDecision,
-    body: () => {
-      const opts = areas().map((a) => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join("");
-      return `
-        <div class="tile-list">
-          ${workcenters()
-            .map((w) => {
-              const issue = w.status === "Data issue";
-              return `
-              <div class="tile-row${issue ? " warn" : ""}">
-                <i data-lucide="${issue ? "alert-triangle" : "cpu"}"></i>
-                <div class="tile-main">
-                  <strong>${escapeHtml(w.name)}</strong>
-                  <span>${escapeHtml(w.capacity)}</span>
-                </div>
-                <select data-wc="${w.id}" class="inline-select">${opts.replace(`value="${w.areaId}"`, `value="${w.areaId}" selected`)}</select>
-              </div>`;
-            })
-            .join("")}
-        </div>
-        <div class="decision-box">
-          <p><i data-lucide="help-circle"></i> Packaging Line 3 has no valid shift calendar in the extract. How should the pilot treat it?</p>
-          <div class="choice-grid two compact">
-            ${choiceTile("flag", state.lineDecision === "flag", "flag", "Flag for cleanup", "Keep it, raise a data task")}
-            ${choiceTile("exclude", state.lineDecision === "exclude", "eye-off", "Exclude from pilot", "Schedule without it for now")}
-          </div>
-        </div>
-      `;
-    },
+    id: "workcenters", phase: "Model", nav: "Resource taxonomy",
+    title: () => `Which ${profile().resource.toLowerCase()} types should the generator represent?`,
+    sub: "Choose capacity-object categories, not named machines or people. Synthetic examples will be linked to compatible department types automatically.",
+    hint: "Select at least one resource type to continue.",
+    gate: () => state.resourceTypes?.length > 0,
+    body: () => `
+      <div class="taxonomy-grid">
+        ${resourceTaxonomy.map((item) => `
+          <button class="taxonomy-card${state.resourceTypes.includes(item.id) ? " active" : ""}" type="button" data-resource-type="${item.id}" aria-pressed="${state.resourceTypes.includes(item.id)}">
+            <i data-lucide="${item.icon}"></i>
+            <span><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.note)}</small></span>
+          </button>
+        `).join("")}
+      </div>
+      <p class="representative-note"><i data-lucide="sparkles"></i> ${state.resourceTypes.length || "No"} resource type${state.resourceTypes.length === 1 ? "" : "s"} will seed representative records.</p>
+    `,
     attach: (root) => {
-      root.querySelectorAll("[data-wc]").forEach((sel) =>
-        sel.addEventListener("change", () => {
-          Model.update(sel.dataset.wc, { areaId: sel.value }, null);
-        })
-      );
-      bindChoices(root, (v) => { state.lineDecision = v; render(); });
+      root.querySelectorAll("[data-resource-type]").forEach((button) => button.addEventListener("click", () => {
+        const selected = new Set(state.resourceTypes);
+        selected.has(button.dataset.resourceType) ? selected.delete(button.dataset.resourceType) : selected.add(button.dataset.resourceType);
+        state.resourceTypes = [...selected];
+        render();
+      }));
     },
   },
   {
@@ -774,7 +780,7 @@ const steps = [
   {
     id: "variant", phase: "Model", nav: "Try a variant",
     title: "Want to try a variant before committing?",
-    sub: "Branching lets you explore a change in isolation. Here: split Packaging into a dedicated Finished-Goods area — see the diff, then keep or revert.",
+    sub: "Branching lets you explore a taxonomy change in isolation. The example uses synthetic Packaging and Finished-Goods records, never customer master data.",
     hint: "Try it or skip to continue.",
     gate: () => state.variant === "kept" || state.variant === "reverted" || state.variant === "skipped",
     body: () => {
@@ -843,9 +849,9 @@ const steps = [
     },
   },
   {
-    id: "demo", phase: "Validate", nav: "Demo",
-    title: "Schedule the rush order.",
-    sub: () => `A rush ${profile().order.toLowerCase()} is due today and needs a packaging line. Pick where it runs — the model scores the choice.`,
+    id: "demo", phase: "Validate", nav: "Representative scenario",
+    title: "Validate with a synthetic scheduling scenario.",
+    sub: () => `A generated rush ${profile().order.toLowerCase()} needs representative packaging capacity. The scenario tests the configured logic without asking for customer orders or resources.`,
     hint: "Schedule the order to continue.",
     gate: () => !!state.demo,
     body: () => {
@@ -885,12 +891,12 @@ const steps = [
         ["Planning objective", state.scope ? "done" : "open", state.scope === "aps-ds" ? "Advanced Planning & Detailed Scheduling" : "Not selected"],
         ["Operating archetypes", state.archetypes?.length ? "done" : "open", state.archetypes?.length ? archetypeSynthesis().title : "Not characterized"],
         ["Industry context", state.industry ? "done" : "open", industry()?.name || "Not selected"],
-        [`${profile().facility} model`, siteName() ? "done" : "open", siteName() ? `${siteName()} · ${areas().length} areas` : "Not named"],
+        ["Department taxonomy", state.departmentTypes?.length ? "done" : "open", state.departmentTypes?.length ? `${state.departmentTypes.length} semantic types selected` : "Not configured"],
         ["Calendars & capacity", state.calendar?.layering ? "done" : "open", state.calendar?.layering ? `${calendarProfile().base} · ${state.calendar.pattern} · ${state.calendar.exceptions}` : "Not characterized"],
-        [`${profile().resource} model`, state.lineDecision ? "done" : "open", state.lineDecision === "flag" ? "Line 3 flagged for cleanup" : state.lineDecision === "exclude" ? "Line 3 excluded" : "Unresolved"],
+        ["Resource taxonomy", state.resourceTypes?.length ? "done" : "open", state.resourceTypes?.length ? `${state.resourceTypes.length} capacity-object types selected` : "Not configured"],
         ["BOM profile", state.bom?.source ? "done" : "open", state.bom?.source ? `${state.bom.structure} · ${state.bom.consumption} · ${state.bom.source}` : "Not characterized"],
         ["Execution feedback", state.execution?.source ? "done" : "open", state.execution?.source ? `${executionSourceLabel()} · ${state.execution.events.join(", ")}` : "Not configured"],
-        ["Demo evidence", state.demo ? "done" : "open", state.demo ? `${state.demo.score}% training score` : "Pending"],
+        ["Representative evidence", state.demo ? "done" : "open", state.demo ? `${state.demo.score}% scenario score` : "Pending"],
         ["Migration risk", "info", state.migration ? "S/4 migration on roadmap" : "No migration planned"],
       ];
       return `
@@ -920,11 +926,12 @@ const steps = [
     sub: "The journey ends where support begins. This exports the model, decisions, and evidence — managed services are out of scope.",
     body: () => {
       const decisions = Model.nodesOfType("decision");
+      const generated = representativeData();
       return `
         <div class="summary-grid">
           <div class="summary-card"><span>Objective</span><strong>${state.scope === "aps-ds" ? "APS / Detailed Scheduling" : "Pending"}</strong><small>hours-to-weeks planning horizon</small></div>
           <div class="summary-card"><span>Industry</span><strong>${industry() ? escapeHtml(industry().name) : "Pending"}</strong><small>${industry() ? escapeHtml(industry().compliance) : "context not selected"}</small></div>
-          <div class="summary-card"><span>Model</span><strong>${areas().length} areas · ${workcenters().length} ${escapeHtml(profile().resource.toLowerCase())}s</strong><small>${Model.events().length} committed events</small></div>
+          <div class="summary-card"><span>Representative data</span><strong>${generated.departments.length} departments · ${generated.resources.length} resources</strong><small>synthetic and replaceable</small></div>
           <div class="summary-card"><span>BOM</span><strong>${state.bom?.structure ? escapeHtml(state.bom.structure) : "Pending"}</strong><small>${state.bom?.source ? escapeHtml(state.bom.source) : "integration grain not set"}</small></div>
           <div class="summary-card"><span>Capacity</span><strong>${state.calendar?.layering ? escapeHtml(state.calendar.layering) : "Pending"}</strong><small>${state.calendar?.pattern ? escapeHtml(state.calendar.pattern) : "calendar pattern not set"}</small></div>
           <div class="summary-card"><span>Execution</span><strong>${escapeHtml(executionSourceLabel())}</strong><small>${state.execution?.events?.length ? escapeHtml(state.execution.events.join(" · ")) : "feedback events not set"}</small></div>
@@ -932,6 +939,14 @@ const steps = [
           <div class="summary-card"><span>Evidence</span><strong>${state.demo ? state.demo.score + "% training" : "Pending"}</strong><small>${state.demo ? "seeds the support runbook" : "no scored scenario"}</small></div>
           <div class="summary-card"><span>Readiness</span><strong>${readiness()}%</strong><small>at handoff</small></div>
         </div>
+        <section class="generated-preview" aria-label="Generated representative dataset">
+          <div class="generated-heading"><div><span>Generated representative dataset</span><strong>${escapeHtml(generated.organization.name)}</strong></div><em>synthetic</em></div>
+          <div class="generated-columns">
+            <div><span>${escapeHtml(profile().area)} examples</span>${generated.departments.map((item) => `<code>${escapeHtml(item.id)}</code><small>${escapeHtml(item.name)}</small>`).join("") || "<small>No department types selected</small>"}</div>
+            <div><span>${escapeHtml(profile().resource)} examples</span>${generated.resources.map((item) => `<code>${escapeHtml(item.id)}</code><small>${escapeHtml(item.name)}</small>`).join("") || "<small>No resource types selected</small>"}</div>
+          </div>
+          <p>${escapeHtml(generated.replacementPolicy)}</p>
+        </section>
         <button class="ghost-btn wide" id="exportBtn" type="button"><i data-lucide="download"></i><span>Export handoff brief (JSON)</span></button>
       `;
     },
@@ -1012,7 +1027,7 @@ function renderCompletion() {
     <div class="complete">
       <div class="complete-mark"><i data-lucide="check"></i></div>
       <h2>Setup complete.</h2>
-      <p>${escapeHtml(siteName())} is modelled, validated at ${readiness()}% readiness, and ready to hand off. You can revisit any step from the rail.</p>
+      <p>The configuration is validated at ${readiness()}% readiness. Its representative dataset is synthetic and ready to be replaced with governed customer data during onboarding.</p>
       <button class="cta" id="reviewBtn" type="button"><i data-lucide="list-checks"></i><span>Review readiness</span></button>
     </div>
   `;
@@ -1084,9 +1099,11 @@ function exportBrief() {
       route: profile().route,
       hierarchy: profile().hierarchy,
     },
-    site: siteName(),
-    areas: areas().map((a) => a.name),
-    workcenters: workcenters().map((w) => ({ name: w.name, area: areaName(w.areaId) })),
+    taxonomies: {
+      departments: selectedDepartmentTypes(),
+      resources: selectedResourceTypes(),
+    },
+    representativeDataset: representativeData(),
     billOfMaterials: state.bom,
     calendarAndCapacity: {
       terminology: calendarProfile(),
@@ -1096,7 +1113,7 @@ function exportBrief() {
       sourceLabel: executionSourceLabel(),
       ...state.execution,
     },
-    decisions: { lineIssue: state.lineDecision, variant: state.variant, migration: state.migration },
+    decisions: { variant: state.variant, migration: state.migration },
     demo: state.demo,
     readiness: `${readiness()}%`,
     governedDecisions: Model.nodesOfType("decision").map((d) => d.props),
