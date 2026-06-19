@@ -236,22 +236,24 @@ const steps = [
       <div class="choice-grid three">
         ${choiceTile("Finite capacity pilot", state.planningMode === "Finite capacity pilot", "sliders-horizontal", "Finite capacity", "Respect real resource limits")}
         ${choiceTile("Rough-cut capacity", state.planningMode === "Rough-cut capacity", "bar-chart-3", "Rough-cut", "Fast, approximate load view")}
-        ${choiceTile("Sequencing pilot", state.planningMode === "Sequencing pilot", "arrow-down-up", "Sequencing", "Order operations on the bottleneck")}
+        ${choiceTile("Sequencing pilot", state.planningMode === "Sequencing pilot", "arrow-down-up", "Sequencing", "Order operations around key constraints")}
       </div>
     `,
     attach: (root) => bindChoices(root, (v) => { state.planningMode = v; render(); }),
   },
   {
-    id: "constraint", phase: "Plant", nav: "Bottleneck",
-    title: "Where is the known bottleneck?",
-    sub: "The constraint anchors the demo scenario and the data checks that follow.",
-    hint: "Pick the primary constraint to continue.",
+    id: "constraint", phase: "Plant", nav: "Constraint view",
+    title: "What is currently known about the constraint?",
+    sub: "Capture the customer's view as a hypothesis, not as planning truth. The limiting constraint may be unknown or shift by horizon, product mix, campaign, and scenario.",
+    hint: "Choose the best current description. It can be refined when data and scenarios reveal more.",
     gate: () => !!state.constraint,
     body: () => `
       <div class="choice-grid three">
-        ${choiceTile("Packaging Line 3", state.constraint === "Packaging Line 3", "alert-triangle", "Packaging Line 3", "Calendar data is incomplete")}
-        ${choiceTile("Mixer A", state.constraint === "Mixer A", "flask-conical", "Mixer A", "Shared across campaigns")}
-        ${choiceTile("QC Release Bench", state.constraint === "QC Release Bench", "microscope", "QC Release Bench", "Release gates the schedule")}
+        ${choiceTile("unknown", state.constraint === "unknown", "circle-help", "Not known yet", "Let data profiling and scenario runs surface likely constraints")}
+        ${choiceTile("shifting", state.constraint === "shifting", "shuffle", "Shifting constraint", "Changes with horizon, product mix, campaign, or operating conditions")}
+        ${choiceTile("Packaging Line 3", state.constraint === "Packaging Line 3", "alert-triangle", "Packaging Line 3", "Customer-observed candidate; calendar data is incomplete")}
+        ${choiceTile("Mixer A", state.constraint === "Mixer A", "flask-conical", "Mixer A", "Customer-observed candidate; shared across campaigns")}
+        ${choiceTile("QC Release Bench", state.constraint === "QC Release Bench", "microscope", "QC Release Bench", "Customer-observed candidate; release may gate the schedule")}
       </div>
     `,
     attach: (root) => bindChoices(root, (v) => { state.constraint = v; render(); }),
