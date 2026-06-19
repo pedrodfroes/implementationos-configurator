@@ -93,7 +93,6 @@ const initialState = {
   archetype: null,
   erp: "sap_pi",
   migration: null,
-  planningMode: null,
   calendar: {
     layering: null,
     pattern: null,
@@ -129,8 +128,12 @@ function load() {
       state = { ...clone(initialState), ...saved };
       if (!("scope" in saved)) {
         state.i = 1;
-        state.max = Math.max(1, Number(saved.max || 0) + 1);
+        state.max = Math.max(1, Number(saved.max || 0));
+      } else if ("planningMode" in saved) {
+        if (state.i > 6) state.i -= 1;
+        if (state.max > 6) state.max -= 1;
       }
+      delete state.planningMode;
     }
   } catch { state = clone(initialState); }
 }
@@ -150,10 +153,9 @@ function areaName(id) { return areas().find((a) => a.id === id)?.name || "Unassi
 
 function readiness() {
   let s = 16;
-  if (state.scope) s += 4;
+  if (state.scope) s += 12;
   if (state.archetype) s += 8;
   if (siteName()) s += 8;
-  if (state.planningMode) s += 8;
   if (state.calendar?.layering && state.calendar?.pattern && state.calendar?.exceptions && state.calendar?.modifiersConfirmed) s += 8;
   if (state.constraint) s += 6;
   if (state.lineDecision) s += 10;
@@ -317,21 +319,6 @@ const steps = [
         refreshGate();
       });
     },
-  },
-  {
-    id: "schedule", phase: "Facility", nav: "Schedule mode",
-    title: "How should the pilot schedule?",
-    sub: "One choice now keeps the model honest. You can refine it later.",
-    hint: "Pick a scheduling mode to continue.",
-    gate: () => !!state.planningMode,
-    body: () => `
-      <div class="choice-grid three">
-        ${choiceTile("Finite capacity pilot", state.planningMode === "Finite capacity pilot", "sliders-horizontal", "Finite capacity", "Respect real resource limits")}
-        ${choiceTile("Rough-cut capacity", state.planningMode === "Rough-cut capacity", "bar-chart-3", "Rough-cut", "Fast, approximate load view")}
-        ${choiceTile("Sequencing pilot", state.planningMode === "Sequencing pilot", "arrow-down-up", "Sequencing", "Order operations around key constraints")}
-      </div>
-    `,
-    attach: (root) => bindChoices(root, (v) => { state.planningMode = v; render(); }),
   },
   {
     id: "calendar", phase: "Facility", nav: "Calendars & capacity",
@@ -679,7 +666,6 @@ const steps = [
       const rows = [
         ["Planning objective", state.scope ? "done" : "open", state.scope === "aps-ds" ? "Advanced Planning & Detailed Scheduling" : "Not selected"],
         [`${profile().facility} model`, siteName() ? "done" : "open", siteName() ? `${siteName()} · ${areas().length} areas` : "Not named"],
-        ["Scheduling", state.planningMode ? "done" : "open", state.planningMode || "Not chosen"],
         ["Calendars & capacity", state.calendar?.layering ? "done" : "open", state.calendar?.layering ? `${calendarProfile().base} · ${state.calendar.pattern} · ${state.calendar.exceptions}` : "Not characterized"],
         [`${profile().resource} model`, state.lineDecision ? "done" : "open", state.lineDecision === "flag" ? "Line 3 flagged for cleanup" : state.lineDecision === "exclude" ? "Line 3 excluded" : "Unresolved"],
         ["BOM profile", state.bom?.source ? "done" : "open", state.bom?.source ? `${state.bom.structure} · ${state.bom.consumption} · ${state.bom.source}` : "Not characterized"],
