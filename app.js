@@ -20,10 +20,28 @@ function escapeHtml(value) {
 
 // ── Reference data ───────────────────────────────────────────────────
 const profiles = {
-  jde: { badge: "JDE", name: "JDE / classic work orders", order: "Work order", route: "Routing", resource: "Work center" },
-  sap_pp: { badge: "SAP PP", name: "SAP ECC PP", order: "Production order", route: "Routing", resource: "Work center" },
-  sap_pi: { badge: "SAP PP-PI", name: "SAP ECC PP-PI", order: "Process order", route: "Master recipe", resource: "Resource" },
-  s4: { badge: "S/4HANA", name: "S/4HANA target state", order: "Manufacturing order", route: "Routing or recipe", resource: "Work center" },
+  jde: { badge: "JDE", name: "JDE / classic work orders", order: "Work order", route: "Routing", facility: "Branch / Plant", storage: "Location", bin: "Lot / Location", area: "Department", resource: "Work center", hierarchy: ["Company", "Branch / Plant", "Location"] },
+  sap_pp: { badge: "SAP PP", name: "SAP ECC PP", order: "Production order", route: "Routing", facility: "Plant", storage: "Storage Location", bin: "Storage Bin", area: "Production Supply Area", resource: "Work Center", hierarchy: ["Client", "Company Code", "Plant", "Storage Location", "Storage Bin"] },
+  sap_pi: { badge: "SAP PP-PI", name: "SAP ECC PP-PI", order: "Process order", route: "Master recipe", facility: "Plant", storage: "Storage Location", bin: "Storage Bin", area: "Production Supply Area", resource: "Resource", hierarchy: ["Client", "Company Code", "Plant", "Storage Location", "Storage Bin"] },
+  s4: { badge: "S/4HANA", name: "S/4HANA", order: "Manufacturing order", route: "Routing or recipe", facility: "Plant", storage: "Storage Location", bin: "Storage Bin", area: "Production Supply Area", resource: "Work Center / Resource", hierarchy: ["Client", "Company Code", "Plant", "Storage Location", "Storage Bin"] },
+  oracle: { badge: "Oracle SCM", name: "Oracle Fusion Cloud SCM", order: "Work order", route: "Work definition", facility: "Inventory / Manufacturing Organization", storage: "Subinventory", bin: "Locator", area: "Work Area", resource: "Work Center / Resource", hierarchy: ["Legal Entity / Business Unit", "Inventory Organization", "Subinventory", "Locator"] },
+  d365: { badge: "D365 SCM", name: "Microsoft Dynamics 365 SCM", order: "Production order", route: "Route", facility: "Site", storage: "Warehouse", bin: "Location", area: "Production Unit", resource: "Resource / Resource Group", hierarchy: ["Legal Entity", "Site", "Warehouse", "Location"] },
+  infor_ln: { badge: "Infor LN", name: "Infor LN", order: "Production order", route: "Routing", facility: "Site", storage: "Warehouse", bin: "Location", area: "Department", resource: "Work Center", hierarchy: ["Company", "Enterprise Unit / Site", "Warehouse / Department", "Location"] },
+  netsuite: { badge: "NetSuite", name: "Oracle NetSuite", order: "Work order", route: "Manufacturing routing", facility: "Location", storage: "Location", bin: "Bin", area: "Production Area", resource: "Work Center", hierarchy: ["Subsidiary", "Location", "Bin"] },
+  odoo: { badge: "Odoo", name: "Odoo Manufacturing", order: "Manufacturing order", route: "BoM / Operations", facility: "Warehouse", storage: "Location", bin: "Location", area: "Production Area", resource: "Work Center", hierarchy: ["Company", "Warehouse", "Location"] },
+  peoplesoft: { badge: "PeopleSoft", name: "PeopleSoft Manufacturing", order: "Production ID", route: "Routing", facility: "Manufacturing Business Unit", storage: "Storage Location", bin: "Storage Location", area: "Production Area", resource: "Work Center", hierarchy: ["SetID / Business Unit", "Manufacturing Business Unit", "Storage Location"] },
+  qad: { badge: "QAD", name: "QAD", order: "Work order", route: "Routing", facility: "Site", storage: "Warehouse", bin: "Location", area: "Department", resource: "Work Center", hierarchy: ["Domain", "Site", "Warehouse", "Location"] },
+  plex: { badge: "Plex", name: "Plex Smart Manufacturing", order: "Job", route: "Routing", facility: "Plant", storage: "Location", bin: "Location", area: "Cell", resource: "Work Center / Cell", hierarchy: ["Enterprise", "Plant", "Location", "Work Center / Cell"] },
+  epicor: { badge: "Epicor", name: "Epicor Kinetic", order: "Job", route: "Method of manufacture", facility: "Plant", storage: "Warehouse", bin: "Bin", area: "Department", resource: "Resource Group / Resource", hierarchy: ["Company", "Site / Plant", "Warehouse", "Bin"] },
+  ifs: { badge: "IFS", name: "IFS Cloud", order: "Shop order", route: "Routing", facility: "Site", storage: "Warehouse", bin: "Location", area: "Production Line", resource: "Work Center", hierarchy: ["Company", "Site", "Warehouse", "Location"] },
+};
+
+const calendarProfiles = {
+  sap: { base: "Factory Calendar", pattern: "Shift / Shift Sequence / Work Schedule", resource: "Work Center Capacity", exception: "Calendar or capacity override", units: "Individual Capacity", efficiency: "Utilization", category: "Capacity Category" },
+  oracle: { base: "Production Calendar", pattern: "Shift", resource: "Work Center Resource Calendar", exception: "Resource Exception", units: "Default Units Available", efficiency: "Efficiency", category: "Resource" },
+  d365: { base: "Calendar", pattern: "Working Time Template / Working Times", resource: "Resource Calendar", exception: "Calendar exception", units: "Capacity", efficiency: "Efficiency", category: "Resource / Resource Group" },
+  infor_ln: { base: "Calendar Code", pattern: "Recurrence / Working Hours", resource: "Work Center Calendar", exception: "Calendar Exception", units: "Resource capacity", efficiency: "Efficiency", category: "Availability Type" },
+  generic: { base: "Production Calendar", pattern: "Shift / Working Time", resource: "Resource Calendar", exception: "Availability Exception", units: "Units Available", efficiency: "Efficiency / Utilization", category: "Capacity Type" },
 };
 
 // The archetype's manufacturing MODE — not the industry — predicts the
@@ -56,16 +74,107 @@ const planningArchetypes = [
   { id: "healthcare-capacity", name: "Healthcare / Capacity", core: "Patients flow through constrained resources with uncertain durations.", mode: "service" },
 ];
 
+const archetypeIcons = {
+  "batch-campaign": "flask-conical",
+  "continuous-process": "waves",
+  "discrete-assembly": "boxes",
+  "cto-eto": "pencil-ruler",
+  "job-shop": "shuffle",
+  "flow-shop": "workflow",
+  "packaging-postponement": "package-open",
+  "perishable-food": "apple",
+  "maturation-aging": "hourglass",
+  "semiconductor-fab": "microchip",
+  "mining-primary": "mountain",
+  "distribution-logistics": "truck",
+  "field-service": "users",
+  "maintenance-turnaround": "wrench",
+  "construction-project": "hard-hat",
+  "healthcare-capacity": "hospital",
+};
+
+const industries = [
+  { id: "pharma", name: "Pharmaceutical / Biopharma", group: "Life sciences", icon: "pill", focus: "GMP batches, potency, genealogy, cleaning, QA release", compliance: "GxP · electronic records · validated processes" },
+  { id: "pesticides", name: "Crop Protection / Pesticides", group: "Agrochemicals", icon: "sprout", focus: "Active ingredients, campaign cleaning, hazardous segregation, pack labels", compliance: "Product registrations · HSE · environmental controls" },
+  { id: "medical-devices", name: "Medical Devices", group: "Life sciences", icon: "stethoscope", focus: "Device history, UDI, controlled assembly, sterilization", compliance: "QMS · traceability · regulated change control" },
+  { id: "food-beverage", name: "Food & Beverage", group: "Consumer process", icon: "utensils", focus: "Shelf life, allergens, recipes, yield, sanitation", compliance: "Food safety · lot traceability · labeling" },
+  { id: "chemicals", name: "Chemicals", group: "Process industries", icon: "flask-conical", focus: "Formulas, tanks, campaigns, co-products, hazardous materials", compliance: "SDS · process safety · environmental controls" },
+  { id: "cpg", name: "Consumer Packaged Goods", group: "Consumer products", icon: "package", focus: "High-SKU packaging, postponement, promotions, changeovers", compliance: "Label control · market variants · traceability" },
+  { id: "automotive", name: "Automotive", group: "Discrete manufacturing", icon: "car", focus: "Sequenced supply, variants, line balance, supplier constraints", compliance: "PPAP · serial genealogy · quality gates" },
+  { id: "industrial", name: "Industrial Equipment", group: "Discrete manufacturing", icon: "cog", focus: "BOM depth, engineer-to-order, skills, tools, long lead parts", compliance: "Configuration control · inspection evidence" },
+  { id: "electronics", name: "Electronics / Semiconductor", group: "High-tech", icon: "microchip", focus: "Reentrant flows, yield, alternates, cleanroom tools", compliance: "Material genealogy · process control · export rules" },
+  { id: "aerospace", name: "Aerospace & Defense", group: "Regulated discrete", icon: "plane", focus: "Effectivity, serialized parts, scarce skills, project networks", compliance: "Airworthiness · full traceability · controlled data" },
+  { id: "metals-mining", name: "Metals / Mining", group: "Primary industries", icon: "mountain", focus: "Blending, grades, campaign assets, energy, extraction", compliance: "Assay · chain of custody · environmental constraints" },
+  { id: "building-materials", name: "Building Materials", group: "Process industries", icon: "brick-wall", focus: "Kilns, campaigns, bulk logistics, energy-intensive assets", compliance: "Quality certificates · emissions · batch traceability" },
+];
+
+const departmentTaxonomy = [
+  { id: "production", name: "Production / Processing", icon: "factory", note: "Core conversion, processing, or assembly activities" },
+  { id: "packaging", name: "Packaging / Finishing", icon: "package-check", note: "Packing, labeling, finishing, and late-stage differentiation" },
+  { id: "quality", name: "Quality / Laboratory", icon: "microscope", note: "Testing, sampling, inspection, and release capacity" },
+  { id: "warehouse", name: "Warehouse / Intralogistics", icon: "warehouse", note: "Storage, staging, dispensing, picking, and internal movement" },
+  { id: "maintenance", name: "Maintenance / Reliability", icon: "wrench", note: "Planned maintenance, repair, calibration, and reliability work" },
+  { id: "utilities", name: "Utilities / Site Services", icon: "zap", note: "Shared utilities, clean media, energy, and environmental services" },
+  { id: "planning", name: "Planning / Production Control", icon: "calendar-range", note: "Scheduling, release, coordination, and production control" },
+  { id: "external", name: "External / Subcontracting", icon: "external-link", note: "Third-party processing, testing, or contract manufacturing" },
+];
+
+const resourceTaxonomy = [
+  { id: "processing-equipment", name: "Processing equipment", icon: "cog", department: "production", note: "Machines, vessels, reactors, or processing units" },
+  { id: "lines-cells", name: "Lines / cells", icon: "workflow", department: "packaging", note: "Packaging, assembly, filling, or production lines" },
+  { id: "labor-crews", name: "Labor / crews", icon: "users", department: "production", note: "People, teams, skills, and shift-based capacity" },
+  { id: "quality-capacity", name: "Quality / lab capacity", icon: "test-tube-2", department: "quality", note: "Benches, instruments, analysts, and release capacity" },
+  { id: "tools-fixtures", name: "Tools / fixtures", icon: "hammer", department: "production", note: "Shared tooling, molds, dies, fixtures, and setup kits" },
+  { id: "material-handling", name: "Storage / material handling", icon: "forklift", department: "warehouse", note: "Locations, tanks, staging lanes, and handling equipment" },
+  { id: "utility-capacity", name: "Utility capacity", icon: "gauge", department: "utilities", note: "Power, steam, clean media, air, water, or environmental limits" },
+  { id: "external-capacity", name: "External capacity", icon: "building-2", department: "external", note: "Suppliers, subcontractors, tollers, and external laboratories" },
+];
+
+const planningLevels = [
+  { id: "strategic", level: "Strategic / network planning", horizon: "Years", question: "Where should we make, source, add capacity, or change the footprint?", terms: "Network design · footprint planning · capacity strategy" },
+  { id: "sop", level: "Sales & Operations Planning", horizon: "12–24 months", question: "Can demand, supply, inventory, and finance agree on one feasible plan?", terms: "S&OP · IBP · aggregate planning" },
+  { id: "master", level: "Master planning", horizon: "3–18 months", question: "What finished goods should we plan to make by period?", terms: "MPS · RCCP · master scheduling" },
+  { id: "material", level: "Material planning", horizon: "Weeks–months", question: "What materials and components are needed, and when?", terms: "MRP · DRP · procurement planning" },
+  { id: "capacity", level: "Capacity planning", horizon: "Weeks–months", question: "Do we have enough labor, machines, tools, and suppliers?", terms: "CRP · RCCP · infinite / finite capacity" },
+  { id: "aps-ds", level: "Advanced Planning & Detailed Scheduling", horizon: "Hours–weeks", question: "Which operation runs where, when, and in what sequence?", terms: "APS · DS · FCS · finite scheduling", available: true },
+  { id: "dispatch", level: "Dispatching / execution", horizon: "Now–days", question: "What should the shop floor do next?", terms: "Dispatch list · MES · shop-floor control" },
+  { id: "monitoring", level: "Monitoring / control", horizon: "Real time–days", question: "Are we late, blocked, starved, overloaded, or deviating?", terms: "WIP control · ATP / CTP · exception management" },
+];
+
 // ── State ────────────────────────────────────────────────────────────
 const initialState = {
   i: 0,
   max: 0,
-  archetype: null,
+  scope: null,
+  archetypes: [],
+  industry: null,
   erp: "sap_pi",
   migration: null,
-  planningMode: null,
+  calendar: {
+    layering: null,
+    pattern: null,
+    exceptions: null,
+    modifiers: [],
+    modifiersConfirmed: false,
+  },
   constraint: null,
-  lineDecision: null,
+  taxonomyMode: "representative",
+  departmentTypes: [],
+  resourceTypes: [],
+  bom: {
+    structure: null,
+    features: [],
+    featuresConfirmed: false,
+    consumption: null,
+    source: null,
+  },
+  execution: {
+    source: null,
+    levels: [],
+    events: [],
+    quantities: [],
+    quantitiesConfirmed: false,
+  },
   variant: null, // null | "active" | "kept" | "reverted" | "skipped"
   demo: null, // { laneId, score, note }
   done: false,
@@ -80,26 +189,119 @@ function save() {
 function load() {
   try {
     const raw = localStorage.getItem(UI_KEY);
-    if (raw) state = { ...clone(initialState), ...JSON.parse(raw) };
+    if (raw) {
+      const saved = JSON.parse(raw);
+      state = { ...clone(initialState), ...saved };
+      if (!Array.isArray(saved.archetypes) && saved.archetype) state.archetypes = [saved.archetype];
+      if (!("scope" in saved)) {
+        state.i = 1;
+        state.max = Math.max(1, Number(saved.max || 0));
+      } else if ("planningMode" in saved) {
+        if (state.i > 6) state.i -= 1;
+        if (state.max > 6) state.max -= 1;
+      }
+      delete state.planningMode;
+      delete state.archetype;
+      if (!("industry" in saved) && Number(saved.max || 0) >= 2) {
+        state.i = 3;
+        state.max = Math.max(3, state.max + 1);
+      }
+      if (!("execution" in saved) && Number(saved.max || 0) >= 11) {
+        state.i = 12;
+        state.max = Math.max(12, state.max + 1);
+      }
+      if (!("taxonomyMode" in saved)) {
+        if (state.i > 6) state.i -= 1;
+        if (state.max > 6) state.max -= 1;
+        if (Number(saved.max || 0) >= 9) state.i = 8;
+        state.departmentTypes = [];
+        state.resourceTypes = [];
+      }
+      delete state.lineDecision;
+    }
   } catch { state = clone(initialState); }
 }
 
 // ── Derived helpers (graph is the source of truth) ───────────────────
 function profile() { return profiles[state.erp]; }
-function archetype() { return planningArchetypes.find((a) => a.id === state.archetype) || null; }
-function mode() { return modeProfiles[archetype()?.mode || "process"]; }
-function areas() { return Model.nodesOfType("area").map((n) => ({ id: n.id, ...n.props })); }
-function workcenters() { return Model.nodesOfType("workcenter").map((n) => ({ id: n.id, ...n.props })); }
-function siteName() { return Model.node("site")?.props.name || ""; }
-function areaName(id) { return areas().find((a) => a.id === id)?.name || "Unassigned"; }
-
+function organizationTerm() {
+  const compact = {
+    oracle: "Inventory Organization",
+    peoplesoft: "Manufacturing BU",
+    epicor: "Site / Plant",
+  };
+  return compact[state.erp] || profile().facility;
+}
+function calendarProfile() {
+  if (["sap_pp", "sap_pi", "s4"].includes(state.erp)) return calendarProfiles.sap;
+  return calendarProfiles[state.erp] || calendarProfiles.generic;
+}
+function selectedArchetypes() {
+  return (state.archetypes || []).map((id) => planningArchetypes.find((item) => item.id === id)).filter(Boolean);
+}
+function industry() { return industries.find((item) => item.id === state.industry) || null; }
+function executionSourceLabel() {
+  return { erp: `${profile().badge} confirmations`, mes: "MES execution events", hybrid: `Hybrid MES + ${profile().badge}` }[state.execution?.source] || "Not configured";
+}
+function selectedDepartmentTypes() { return departmentTaxonomy.filter((item) => state.departmentTypes?.includes(item.id)); }
+function selectedResourceTypes() { return resourceTaxonomy.filter((item) => state.resourceTypes?.includes(item.id)); }
+function representativeData() {
+  const departments = selectedDepartmentTypes().map((item, index) => ({
+    id: `DEPT-${String(index + 1).padStart(3, "0")}`,
+    name: `${item.name} 01`,
+    taxonomyType: item.id,
+    synthetic: true,
+  }));
+  const resources = selectedResourceTypes().map((item, index) => ({
+    id: `RES-${String(index + 1).padStart(3, "0")}`,
+    name: `${item.name} 01`,
+    taxonomyType: item.id,
+    departmentId: departments.find((department) => department.taxonomyType === item.department)?.id || null,
+    relationshipStatus: departments.some((department) => department.taxonomyType === item.department) ? "mapped by taxonomy" : "left unassigned for customer mapping",
+    synthetic: true,
+  }));
+  return {
+    replacementPolicy: "Representative synthetic records; replace with governed customer master data during onboarding.",
+    organization: { id: "ORG-001", name: `Demo ${organizationTerm()} 01`, type: profile().facility, synthetic: true },
+    departments,
+    resources,
+  };
+}
+function modeMix() {
+  const selected = selectedArchetypes();
+  const counts = {};
+  selected.forEach((item) => { counts[item.mode] = (counts[item.mode] || 0) + 1; });
+  let dominant = selected[0]?.mode || "process";
+  selected.forEach((item) => {
+    if ((counts[item.mode] || 0) > (counts[dominant] || 0)) dominant = item.mode;
+  });
+  return { dominant, overlays: Object.keys(counts).filter((key) => key !== dominant), counts };
+}
+function mode() { return modeProfiles[modeMix().dominant]; }
+function archetypeSynthesis() {
+  const selected = selectedArchetypes();
+  const mix = modeMix();
+  if (!selected.length) return { title: "No operating pattern selected", detail: "Choose every pattern that materially shapes planning.", count: 0 };
+  if (selected.length === 1) return { title: selected[0].name, detail: modeProfiles[selected[0].mode].note, count: 1 };
+  const dominant = modeProfiles[mix.dominant].label;
+  const overlays = mix.overlays.map((key) => modeProfiles[key].label).join(", ");
+  return {
+    title: overlays ? `${dominant} backbone with ${overlays} overlay` : `${dominant} composite`,
+    detail: overlays ? `The ${dominant.toLowerCase()} model drives terminology; secondary constraints remain explicit downstream.` : `${selected.length} compatible patterns are synthesized inside one ${dominant.toLowerCase()} model.`,
+    count: selected.length,
+  };
+}
 function readiness() {
   let s = 16;
-  if (state.archetype) s += 8;
-  if (siteName()) s += 8;
-  if (state.planningMode) s += 8;
+  if (state.scope) s += 12;
+  if (state.archetypes?.length) s += 8;
+  if (state.industry) s += 6;
+  if (state.departmentTypes?.length) s += 8;
+  if (state.calendar?.layering && state.calendar?.pattern && state.calendar?.exceptions && state.calendar?.modifiersConfirmed) s += 8;
   if (state.constraint) s += 6;
-  if (state.lineDecision) s += 10;
+  if (state.resourceTypes?.length) s += 10;
+  if (state.bom?.structure && state.bom?.featuresConfirmed && state.bom?.consumption && state.bom?.source) s += 8;
+  if (state.execution?.source && state.execution?.levels?.length && state.execution?.events?.length && state.execution?.quantitiesConfirmed) s += 8;
   if (state.variant && state.variant !== "active") s += 6;
   if (state.demo) s += Math.round(state.demo.score * 0.24);
   if (state.migration) s -= 4;
@@ -125,29 +327,69 @@ const steps = [
     `,
   },
   {
+    id: "scope", phase: "Scope", nav: "Planning objective",
+    title: "What are you actually trying to accomplish?",
+    sub: "Choose the planning level before describing the manufacturing archetype. Adjacent levels stay visible so the project boundary is explicit, but this demo currently supports APS and Detailed Scheduling only.",
+    hint: "Select Advanced Planning & Detailed Scheduling to continue.",
+    gate: () => state.scope === "aps-ds",
+    body: () => `
+      <div class="scope-grid">
+        ${planningLevels.map((item, index) => `
+          <button class="scope-card${item.available ? " available" : " inactive"}${state.scope === item.id ? " active" : ""}" type="button"
+            ${item.available ? `data-scope="${item.id}"` : "disabled"}
+            title="${item.available ? "Available in this demo" : "Visible for context; not active in this demo yet"}">
+            <span class="scope-index">${String(index + 1).padStart(2, "0")}</span>
+            <span class="scope-copy">
+              <span class="scope-topline"><strong>${escapeHtml(item.level)}</strong><em>${escapeHtml(item.horizon)}</em></span>
+              <span class="scope-question">${escapeHtml(item.question)}</span>
+              <small>${escapeHtml(item.terms)}</small>
+            </span>
+            <i data-lucide="${item.available ? "arrow-right" : "lock-keyhole"}"></i>
+          </button>
+        `).join("")}
+      </div>
+    `,
+    attach: (root) => {
+      root.querySelector("[data-scope]")?.addEventListener("click", (event) => {
+        state.scope = event.currentTarget.dataset.scope;
+        render();
+      });
+    },
+  },
+  {
     id: "archetype", phase: "Characterize", nav: "Archetype",
     title: "What are you implementing?",
-    sub: "Pick the pattern that dominates how work actually flows. It shapes terminology, constraints, and the whole model.",
-    hint: "Choose an archetype to continue.",
-    gate: () => !!state.archetype,
-    body: () => `
-      <div class="pick-grid">
+    sub: "Select every pattern that materially shapes the operation. The model will synthesize a planning backbone without erasing secondary behavior.",
+    hint: "Choose at least one archetype to continue.",
+    gate: () => state.archetypes?.length > 0,
+    body: () => {
+      const synthesis = archetypeSynthesis();
+      return `
+      <div class="archetype-synthesis${synthesis.count ? " populated" : ""}">
+        <i data-lucide="layers-3"></i>
+        <div><strong>${escapeHtml(synthesis.title)}</strong><p>${escapeHtml(synthesis.detail)}</p></div>
+        <span>${synthesis.count} selected</span>
+      </div>
+      <div class="pick-grid" aria-label="Manufacturing archetypes">
         ${planningArchetypes
           .map(
             (a) => `
-          <button class="pick-card${a.id === state.archetype ? " active" : ""}" type="button" data-arch="${a.id}">
-            <span class="pick-mode">${escapeHtml(modeProfiles[a.mode].label)}</span>
+          <button class="pick-card${state.archetypes.includes(a.id) ? " active" : ""}" type="button" data-arch="${a.id}" data-mode="${a.mode}" aria-pressed="${state.archetypes.includes(a.id)}">
+            <span class="pick-head"><i data-lucide="${archetypeIcons[a.id]}"></i><span class="pick-mode">${escapeHtml(modeProfiles[a.mode].label)}</span></span>
             <strong>${escapeHtml(a.name)}</strong>
             <p>${escapeHtml(a.core)}</p>
           </button>`
           )
           .join("")}
       </div>
-    `,
+    `;
+    },
     attach: (root) => {
       root.querySelectorAll("[data-arch]").forEach((b) =>
         b.addEventListener("click", () => {
-          state.archetype = b.dataset.arch;
+          const selected = new Set(state.archetypes);
+          selected.has(b.dataset.arch) ? selected.delete(b.dataset.arch) : selected.add(b.dataset.arch);
+          state.archetypes = [...selected];
           state.erp = mode().erp;
           render();
         })
@@ -155,33 +397,71 @@ const steps = [
     },
   },
   {
+    id: "industry", phase: "Characterize", nav: "Industry context",
+    title: "Which industry context shapes the implementation?",
+    sub: "Industry does not replace the operating archetype. It adds the regulatory, quality, traceability, safety, and terminology lens that makes the same production pattern behave differently.",
+    hint: "Choose the primary industry context to continue.",
+    gate: () => !!state.industry,
+    body: () => {
+      const selected = industry();
+      return `
+        ${selected ? `
+          <div class="industry-synthesis">
+            <i data-lucide="${selected.icon}"></i>
+            <div><strong>${escapeHtml(selected.name)}</strong><p>${escapeHtml(selected.focus)}</p></div>
+            <span>${escapeHtml(selected.compliance)}</span>
+          </div>` : ""}
+        <div class="industry-grid">
+          ${industries.map((item) => `
+            <button class="industry-card${state.industry === item.id ? " active" : ""}" type="button" data-industry="${item.id}" aria-pressed="${state.industry === item.id}">
+              <i data-lucide="${item.icon}"></i>
+              <span><small>${escapeHtml(item.group)}</small><strong>${escapeHtml(item.name)}</strong><em>${escapeHtml(item.focus)}</em></span>
+            </button>
+          `).join("")}
+        </div>
+      `;
+    },
+    attach: (root) => {
+      root.querySelectorAll("[data-industry]").forEach((button) => button.addEventListener("click", () => {
+        state.industry = button.dataset.industry;
+        render();
+      }));
+    },
+  },
+  {
     id: "dialect", phase: "Characterize", nav: "Dialect",
     title: "Confirm the planning dialect.",
-    sub: "Your archetype is a process or discrete pattern — that decides the ERP language the model speaks. Override if the client's system differs.",
+    sub: "The synthesized operating backbone recommends the planning language. Secondary archetypes remain overlays; override the ERP dialect if the client's system differs.",
     body: () => `
       <div class="derive">
         <div class="derive-chain">
-          <span class="chain-node">${escapeHtml(archetype()?.name || "—")}</span>
+          <span class="chain-node industry-node">${escapeHtml(industry()?.name || "Industry not set")}</span>
+          <i data-lucide="plus"></i>
+          <span class="chain-node">${escapeHtml(archetypeSynthesis().count === 1 ? archetypeSynthesis().title : `${archetypeSynthesis().count} reconciled patterns`)}</span>
           <i data-lucide="arrow-right"></i>
           <span class="chain-node accent">${escapeHtml(mode().label)}</span>
           <i data-lucide="arrow-right"></i>
           <span class="chain-node">${escapeHtml(profile().badge)}</span>
         </div>
-        <p class="derive-note">${escapeHtml(mode().note)}</p>
+        <p class="derive-note">${escapeHtml(mode().note)} ${industry() ? `Industry lens: ${escapeHtml(industry().focus)}` : ""}</p>
         <label class="field big-field">
           <span>ERP dialect</span>
           <select id="erpSelect">
-            <option value="jde">JDE / classic work orders</option>
-            <option value="sap_pp">SAP ECC PP</option>
-            <option value="sap_pi">SAP ECC PP-PI</option>
-            <option value="s4">S/4HANA target state</option>
+            ${Object.entries(profiles).map(([id, item]) => `<option value="${escapeHtml(id)}">${escapeHtml(item.name)}</option>`).join("")}
           </select>
         </label>
+        <div class="derive-chain hierarchy-chain" aria-label="ERP organization hierarchy">
+          ${profile().hierarchy.map((term, index) => `${index ? '<i data-lucide="arrow-right"></i>' : ""}<span class="chain-node">${escapeHtml(term)}</span>`).join("")}
+        </div>
         <div class="vocab-line">
           <span>You'll plan</span>
           <strong>${escapeHtml(profile().order)}s</strong>
           <em>against</em>
           <strong>${escapeHtml(profile().route)}s</strong>
+          <em>at</em>
+          <strong>${escapeHtml(profile().facility)}</strong>
+          <em>using</em>
+          <strong>${escapeHtml(profile().resource)}s</strong>
         </div>
       </div>
     `,
@@ -206,136 +486,301 @@ const steps = [
     attach: (root) => bindChoices(root, (v) => { state.migration = v === "yes"; render(); }),
   },
   {
-    id: "site", phase: "Plant", nav: "Plant name",
-    title: "Name the plant.",
-    sub: "This becomes the root of the model — every area, resource, and decision hangs off it.",
-    hint: "Enter a plant name to continue.",
-    gate: () => siteName().trim().length > 0,
-    body: () => `
-      <label class="field big-field solo">
-        <span>Plant name</span>
-        <input id="siteInput" type="text" value="${escapeHtml(siteName())}" placeholder="e.g. Milano Packaging Plant" autocomplete="off" />
-      </label>
-    `,
-    attach: (root) => {
-      const input = root.querySelector("#siteInput");
-      input.focus();
-      input.addEventListener("input", () => {
-        Model.update("site", { name: input.value || "" });
-        refreshGate();
-      });
+    id: "calendar", phase: () => organizationTerm(), nav: "Calendars & capacity",
+    title: "Where does available capacity really come from?",
+    sub: () => `${calendarProfile().base} defines broad working days; ${calendarProfile().resource} determines whether a specific ${profile().resource.toLowerCase()} can actually run. Capture both layers before APS interprets an open day as usable capacity.`,
+    hint: "Complete all four calendar and capacity dimensions to continue.",
+    gate: () => !!(state.calendar?.layering && state.calendar?.pattern && state.calendar?.exceptions && state.calendar?.modifiersConfirmed),
+    body: () => {
+      const cal = state.calendar || initialState.calendar;
+      const terms = calendarProfile();
+      const modifier = (value, icon, title, sub) => choiceTile(value, cal.modifiers.includes(value), icon, title, sub).replace("data-choice", "data-calendar-modifier");
+      return `
+        <div class="capacity-profile">
+          <section class="capacity-dimension">
+            <div class="dimension-heading"><span>01</span><div><strong>Availability layers</strong><small>Where open time is defined</small></div></div>
+            <div class="choice-grid three compact" data-calendar-group="layering">
+              ${choiceTile("facility-only", cal.layering === "facility-only", "calendar-days", terms.base, `Only the ${profile().facility.toLowerCase()}-level calendar is available`)}
+              ${choiceTile("resource-only", cal.layering === "resource-only", "cpu", terms.resource, `Availability is maintained directly on each ${profile().resource.toLowerCase()}`)}
+              ${choiceTile("layered", cal.layering === "layered", "layers-3", "Layered calendars", `${terms.base} plus ${terms.resource.toLowerCase()} overrides`)}
+            </div>
+          </section>
+          <section class="capacity-dimension">
+            <div class="dimension-heading"><span>02</span><div><strong>Working-time pattern</strong><small>${escapeHtml(terms.pattern)}</small></div></div>
+            <div class="choice-grid three compact" data-calendar-group="pattern">
+              ${choiceTile("single-shift", cal.pattern === "single-shift", "sun", "Single shift", "One recurring work interval per working day")}
+              ${choiceTile("multi-shift", cal.pattern === "multi-shift", "clock-3", "Multiple shifts", "Two or more named intervals share the day")}
+              ${choiceTile("variable", cal.pattern === "variable", "calendar-range", "Variable / rotating", "Patterns change by day, week, crew, or activity")}
+            </div>
+          </section>
+          <section class="capacity-dimension">
+            <div class="dimension-heading"><span>03</span><div><strong>Exceptions</strong><small>${escapeHtml(terms.exception)}</small></div></div>
+            <div class="choice-grid three compact" data-calendar-group="exceptions">
+              ${choiceTile("base-only", cal.exceptions === "base-only", "calendar-off", "Base-calendar only", "Holidays and closures apply broadly")}
+              ${choiceTile("resource-overrides", cal.exceptions === "resource-overrides", "wrench", "Resource overrides", "Maintenance and local downtime override open days")}
+              ${choiceTile("multi-activity", cal.exceptions === "multi-activity", "calendar-cog", "Activity-specific", "Production, service, logistics, or other availability differs")}
+            </div>
+          </section>
+          <section class="capacity-dimension">
+            <div class="dimension-heading"><span>04</span><div><strong>Capacity modifiers</strong><small>Select all supplied by the ERP</small></div></div>
+            <div class="choice-grid compact capacity-modifiers">
+              ${modifier("units", "copy", terms.units, "Number of parallel people, machines, or capacity units")}
+              ${modifier("efficiency", "gauge", terms.efficiency, "Usable percentage or performance factor")}
+              ${modifier("category", "tags", terms.category, "Machine, labor, setup, processing, or activity type")}
+              ${choiceTile("none", cal.modifiersConfirmed && cal.modifiers.length === 0, "circle-slash-2", "None supplied", "Use working time without additional modifiers").replace("data-choice", "data-calendar-modifier-none")}
+            </div>
+          </section>
+        </div>
+      `;
     },
-  },
-  {
-    id: "schedule", phase: "Plant", nav: "Schedule mode",
-    title: "How should the pilot schedule?",
-    sub: "One choice now keeps the model honest. You can refine it later.",
-    hint: "Pick a scheduling mode to continue.",
-    gate: () => !!state.planningMode,
-    body: () => `
-      <div class="choice-grid three">
-        ${choiceTile("Finite capacity pilot", state.planningMode === "Finite capacity pilot", "sliders-horizontal", "Finite capacity", "Respect real resource limits")}
-        ${choiceTile("Rough-cut capacity", state.planningMode === "Rough-cut capacity", "bar-chart-3", "Rough-cut", "Fast, approximate load view")}
-        ${choiceTile("Sequencing pilot", state.planningMode === "Sequencing pilot", "arrow-down-up", "Sequencing", "Order operations on the bottleneck")}
-      </div>
-    `,
-    attach: (root) => bindChoices(root, (v) => { state.planningMode = v; render(); }),
-  },
-  {
-    id: "constraint", phase: "Plant", nav: "Bottleneck",
-    title: "Where is the known bottleneck?",
-    sub: "The constraint anchors the demo scenario and the data checks that follow.",
-    hint: "Pick the primary constraint to continue.",
-    gate: () => !!state.constraint,
-    body: () => `
-      <div class="choice-grid three">
-        ${choiceTile("Packaging Line 3", state.constraint === "Packaging Line 3", "alert-triangle", "Packaging Line 3", "Calendar data is incomplete")}
-        ${choiceTile("Mixer A", state.constraint === "Mixer A", "flask-conical", "Mixer A", "Shared across campaigns")}
-        ${choiceTile("QC Release Bench", state.constraint === "QC Release Bench", "microscope", "QC Release Bench", "Release gates the schedule")}
-      </div>
-    `,
-    attach: (root) => bindChoices(root, (v) => { state.constraint = v; render(); }),
-  },
-  {
-    id: "areas", phase: "Model", nav: "Areas",
-    title: "Confirm the operating areas.",
-    sub: "These came from the template. Add anything the plant has that's missing.",
-    gate: () => areas().length > 0,
-    body: () => `
-      <div class="tile-list">
-        ${areas()
-          .map(
-            (a) => `
-          <div class="tile-row">
-            <i data-lucide="layout-grid"></i>
-            <div><strong>${escapeHtml(a.name)}</strong><span>${workcenters().filter((w) => w.areaId === a.id).length} ${escapeHtml(profile().resource.toLowerCase())}s</span></div>
-          </div>`
-          )
-          .join("")}
-      </div>
-      <form class="add-row" id="areaForm">
-        <input id="areaInput" type="text" placeholder="Add an area or department" autocomplete="off" />
-        <button class="ghost-btn" type="submit"><i data-lucide="plus"></i><span>Add</span></button>
-      </form>
-    `,
     attach: (root) => {
-      root.querySelector("#areaForm").addEventListener("submit", (e) => {
-        e.preventDefault();
-        const name = root.querySelector("#areaInput").value.trim();
-        if (!name) return;
-        const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `area-${Date.now()}`;
-        Model.add({ id, type: "area", props: { name, color: "teal" } }, `${name} added to the site model.`);
+      root.querySelectorAll("[data-calendar-group]").forEach((group) => {
+        group.querySelectorAll("[data-choice]").forEach((button) => button.addEventListener("click", () => {
+          state.calendar[group.dataset.calendarGroup] = button.dataset.choice;
+          render();
+        }));
+      });
+      root.querySelectorAll("[data-calendar-modifier]").forEach((button) => button.addEventListener("click", () => {
+        const value = button.dataset.calendarModifier;
+        const selected = new Set(state.calendar.modifiers);
+        selected.has(value) ? selected.delete(value) : selected.add(value);
+        state.calendar.modifiers = [...selected];
+        state.calendar.modifiersConfirmed = true;
+        render();
+      }));
+      root.querySelector("[data-calendar-modifier-none]")?.addEventListener("click", () => {
+        state.calendar.modifiers = [];
+        state.calendar.modifiersConfirmed = true;
         render();
       });
     },
   },
   {
-    id: "workcenters", phase: "Model", nav: "Work centers",
-    title: "Place each work center — and settle the data issue.",
-    sub: "One resource came in with a missing calendar. Decide how the pilot handles it before moving on.",
-    hint: "Resolve Packaging Line 3 to continue.",
-    gate: () => !!state.lineDecision,
+    id: "constraint", phase: () => organizationTerm(), nav: "Constraint view",
+    title: "What is currently known about the constraint?",
+    sub: "Capture the customer's view as a hypothesis, not as planning truth. The limiting constraint may be unknown or shift by horizon, product mix, campaign, and scenario.",
+    hint: "Choose the best current description. It can be refined when data and scenarios reveal more.",
+    gate: () => !!state.constraint,
+    body: () => `
+      <div class="choice-grid three">
+        ${choiceTile("unknown", state.constraint === "unknown", "circle-help", "Not known yet", "Let data profiling and scenario runs surface likely constraints")}
+        ${choiceTile("shifting", state.constraint === "shifting", "shuffle", "Shifting constraint", "Changes with horizon, product mix, campaign, or operating conditions")}
+        ${choiceTile("equipment-family", state.constraint === "equipment-family", "cog", "Equipment family", "Customer-observed capacity pattern; representative resources will illustrate it")}
+        ${choiceTile("shared-stage", state.constraint === "shared-stage", "workflow", "Shared processing stage", "A shared stage may constrain multiple products or campaigns")}
+        ${choiceTile("quality-release", state.constraint === "quality-release", "microscope", "Quality release", "Inspection, testing, or release capacity may gate the schedule")}
+      </div>
+    `,
+    attach: (root) => bindChoices(root, (v) => { state.constraint = v; render(); }),
+  },
+  {
+    id: "areas", phase: "Model", nav: "Department taxonomy",
+    title: () => `Which ${profile().area.toLowerCase()} types belong in the representative model?`,
+    sub: "Select semantic categories, not customer department names. The generator will create synthetic examples that preserve these roles and relationships.",
+    hint: "Select at least one department type to continue.",
+    gate: () => state.departmentTypes?.length > 0,
+    body: () => `
+      <div class="taxonomy-grid">
+        ${departmentTaxonomy.map((item) => `
+          <button class="taxonomy-card${state.departmentTypes.includes(item.id) ? " active" : ""}" type="button" data-department-type="${item.id}" aria-pressed="${state.departmentTypes.includes(item.id)}">
+            <i data-lucide="${item.icon}"></i>
+            <span><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.note)}</small></span>
+          </button>
+        `).join("")}
+      </div>
+      <p class="representative-note"><i data-lucide="sparkles"></i> ${state.departmentTypes.length || "No"} department type${state.departmentTypes.length === 1 ? "" : "s"} will seed representative records.</p>
+    `,
+    attach: (root) => {
+      root.querySelectorAll("[data-department-type]").forEach((button) => button.addEventListener("click", () => {
+        const selected = new Set(state.departmentTypes);
+        selected.has(button.dataset.departmentType) ? selected.delete(button.dataset.departmentType) : selected.add(button.dataset.departmentType);
+        state.departmentTypes = [...selected];
+        render();
+      }));
+    },
+  },
+  {
+    id: "workcenters", phase: "Model", nav: "Resource taxonomy",
+    title: () => `Which ${profile().resource.toLowerCase()} types should the generator represent?`,
+    sub: "Choose capacity-object categories, not named machines or people. Synthetic examples will be linked to compatible department types automatically.",
+    hint: "Select at least one resource type to continue.",
+    gate: () => state.resourceTypes?.length > 0,
+    body: () => `
+      <div class="taxonomy-grid">
+        ${resourceTaxonomy.map((item) => `
+          <button class="taxonomy-card${state.resourceTypes.includes(item.id) ? " active" : ""}" type="button" data-resource-type="${item.id}" aria-pressed="${state.resourceTypes.includes(item.id)}">
+            <i data-lucide="${item.icon}"></i>
+            <span><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.note)}</small></span>
+          </button>
+        `).join("")}
+      </div>
+      <p class="representative-note"><i data-lucide="sparkles"></i> ${state.resourceTypes.length || "No"} resource type${state.resourceTypes.length === 1 ? "" : "s"} will seed representative records.</p>
+    `,
+    attach: (root) => {
+      root.querySelectorAll("[data-resource-type]").forEach((button) => button.addEventListener("click", () => {
+        const selected = new Set(state.resourceTypes);
+        selected.has(button.dataset.resourceType) ? selected.delete(button.dataset.resourceType) : selected.add(button.dataset.resourceType);
+        state.resourceTypes = [...selected];
+        render();
+      }));
+    },
+  },
+  {
+    id: "bom", phase: "Model", nav: "BOM profile",
+    title: "How does the product structure reach planning?",
+    sub: () => `Characterize the ${profile().route.toLowerCase()} and component model across four independent dimensions. APS should preserve what matters without assuming every ERP sends a clean master BOM.`,
+    hint: "Complete all four BOM dimensions to continue.",
+    gate: () => !!(state.bom?.structure && state.bom?.featuresConfirmed && state.bom?.consumption && state.bom?.source),
     body: () => {
-      const opts = areas().map((a) => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join("");
+      const bom = state.bom || initialState.bom;
+      const feature = (value, icon, title, sub) => choiceTile(value, bom.features.includes(value), icon, title, sub).replace("data-choice", "data-bom-feature");
       return `
-        <div class="tile-list">
-          ${workcenters()
-            .map((w) => {
-              const issue = w.status === "Data issue";
-              return `
-              <div class="tile-row${issue ? " warn" : ""}">
-                <i data-lucide="${issue ? "alert-triangle" : "cpu"}"></i>
-                <div class="tile-main">
-                  <strong>${escapeHtml(w.name)}</strong>
-                  <span>${escapeHtml(w.capacity)}</span>
-                </div>
-                <select data-wc="${w.id}" class="inline-select">${opts.replace(`value="${w.areaId}"`, `value="${w.areaId}" selected`)}</select>
-              </div>`;
-            })
-            .join("")}
-        </div>
-        <div class="decision-box">
-          <p><i data-lucide="help-circle"></i> Packaging Line 3 has no valid shift calendar in the extract. How should the pilot treat it?</p>
-          <div class="choice-grid two compact">
-            ${choiceTile("flag", state.lineDecision === "flag", "flag", "Flag for cleanup", "Keep it, raise a data task")}
-            ${choiceTile("exclude", state.lineDecision === "exclude", "eye-off", "Exclude from pilot", "Schedule without it for now")}
-          </div>
+        <div class="bom-profile">
+          <section class="bom-dimension">
+            <div class="dimension-heading"><span>01</span><div><strong>Structure</strong><small>How components are represented</small></div></div>
+            <div class="choice-grid three compact" data-bom-group="structure">
+              ${choiceTile("multi-level", bom.structure === "multi-level", "network", "Multi-level", "Preserve assemblies and lower-level dependencies")}
+              ${choiceTile("single-level", bom.structure === "single-level", "list-tree", "Collapsed single level", "Planning receives an exploded component list")}
+              ${choiceTile("recipe-formula", bom.structure === "recipe-formula", "flask-conical", "Recipe / formula", "Ingredients, quantities, phases, or process instructions")}
+            </div>
+          </section>
+          <section class="bom-dimension">
+            <div class="dimension-heading"><span>02</span><div><strong>Special behavior</strong><small>Select all that occur</small></div></div>
+            <div class="choice-grid compact bom-features">
+              ${feature("phantoms", "combine", "Phantom assemblies", "Logical groupings exploded without their own order")}
+              ${feature("recursion", "repeat-2", "Recursion / loops", "Rework, co-products, or structures that revisit themselves")}
+              ${feature("potency", "test-tube-2", "Lot potency / assay", "Required quantity varies by lot strength or concentration")}
+              ${choiceTile("none", bom.featuresConfirmed && bom.features.length === 0, "circle-slash-2", "None identified", "Explicitly confirm no special behavior").replace("data-choice", "data-bom-feature-none")}
+            </div>
+          </section>
+          <section class="bom-dimension">
+            <div class="dimension-heading"><span>03</span><div><strong>Consumption linkage</strong><small>Where demand is attached</small></div></div>
+            <div class="choice-grid three compact" data-bom-group="consumption">
+              ${choiceTile("operation", bom.consumption === "operation", "git-commit-horizontal", "Operation-linked", "Each component points to a consuming operation or phase")}
+              ${choiceTile("order", bom.consumption === "order", "package", "Order-level", "Components are consumed without an operation assignment")}
+              ${choiceTile("mixed", bom.consumption === "mixed", "split", "Mixed", "Operation-linked and order-level consumption coexist")}
+            </div>
+          </section>
+          <section class="bom-dimension">
+            <div class="dimension-heading"><span>04</span><div><strong>Integration grain</strong><small>What the ERP actually sends</small></div></div>
+            <div class="choice-grid three compact" data-bom-group="source">
+              ${choiceTile("master", bom.source === "master", "library", "Master BOM / recipe", "Versioned product structure from master data")}
+              ${choiceTile("order-specific", bom.source === "order-specific", "clipboard-list", "Order BOM", "Copied or changed structure attached to the order")}
+              ${choiceTile("allocation", bom.source === "allocation", "boxes", "Allocation / reservation", "Actual reserved materials, batches, or supply assignments")}
+              ${choiceTile("hybrid", bom.source === "hybrid", "layers-3", "Hybrid", "Master structure plus order and reservation deltas")}
+            </div>
+          </section>
         </div>
       `;
     },
     attach: (root) => {
-      root.querySelectorAll("[data-wc]").forEach((sel) =>
-        sel.addEventListener("change", () => {
-          Model.update(sel.dataset.wc, { areaId: sel.value }, null);
-        })
-      );
-      bindChoices(root, (v) => { state.lineDecision = v; render(); });
+      root.querySelectorAll("[data-bom-group]").forEach((group) => {
+        group.querySelectorAll("[data-choice]").forEach((button) => button.addEventListener("click", () => {
+          state.bom[group.dataset.bomGroup] = button.dataset.choice;
+          render();
+        }));
+      });
+      root.querySelectorAll("[data-bom-feature]").forEach((button) => button.addEventListener("click", () => {
+        const value = button.dataset.bomFeature;
+        const selected = new Set(state.bom.features);
+        selected.has(value) ? selected.delete(value) : selected.add(value);
+        state.bom.features = [...selected];
+        state.bom.featuresConfirmed = true;
+        render();
+      }));
+      root.querySelector("[data-bom-feature-none]")?.addEventListener("click", () => {
+        state.bom.features = [];
+        state.bom.featuresConfirmed = true;
+        render();
+      });
+    },
+  },
+  {
+    id: "execution", phase: "Model", nav: "Execution feedback",
+    title: "How does actual execution return to planning?",
+    sub: () => `Configure the feedback contract separately from the ${profile().route.toLowerCase()}. MES events and ${profile().badge} confirmations may describe the same work at different levels and times.`,
+    hint: "Complete the source, reporting level, event, and quantity configuration.",
+    gate: () => !!(state.execution?.source && state.execution?.levels?.length && state.execution?.events?.length && state.execution?.quantitiesConfirmed),
+    body: () => {
+      const execution = state.execution || initialState.execution;
+      const signal = (group, value, icon, title, sub) => {
+        const attribute = { levels: "level", events: "event", quantities: "quantity" }[group];
+        return choiceTile(value, execution[group].includes(value), icon, title, sub).replace("data-choice", `data-execution-${attribute}`);
+      };
+      const sourceNote = {
+        erp: `${profile().badge} is the execution system of record and sends official confirmations.`,
+        mes: `MES sends detailed execution events; ${profile().badge} remains planning context rather than the confirmation source.`,
+        hybrid: `MES provides event detail while ${profile().badge} provides official postings; identifiers and duplicate-event rules must reconcile both.`,
+      }[execution.source];
+      return `
+        ${sourceNote ? `<div class="execution-synthesis"><i data-lucide="refresh-cw"></i><span>${escapeHtml(sourceNote)}</span></div>` : ""}
+        <div class="execution-profile">
+          <section class="execution-dimension">
+            <div class="dimension-heading"><span>01</span><div><strong>System of record</strong><small>Who publishes execution truth</small></div></div>
+            <div class="choice-grid three compact" data-execution-group="source">
+              ${choiceTile("erp", execution.source === "erp", "database", `${profile().badge} confirmations`, "ERP owns starts, finishes, and quantities")}
+              ${choiceTile("mes", execution.source === "mes", "monitor-cog", "MES execution events", "MES owns detailed shop-floor feedback")}
+              ${choiceTile("hybrid", execution.source === "hybrid", "git-merge", "Hybrid MES + ERP", "MES detail reconciled to official ERP postings")}
+            </div>
+          </section>
+          <section class="execution-dimension">
+            <div class="dimension-heading"><span>02</span><div><strong>Reporting level</strong><small>Select every level received</small></div></div>
+            <div class="choice-grid three compact">
+              ${signal("levels", "order-batch", "clipboard-list", `${profile().order} / batch`, "One confirmation summarizes the whole order or batch")}
+              ${signal("levels", "operation-step", "list-checks", "Operation / step", "Feedback is attached to a routing operation or instruction step")}
+              ${signal("levels", "phase", "split", "Phase", "Process phases publish their own execution status")}
+            </div>
+          </section>
+          <section class="execution-dimension">
+            <div class="dimension-heading"><span>03</span><div><strong>Lifecycle events</strong><small>Select every event received</small></div></div>
+            <div class="choice-grid three compact">
+              ${signal("events", "start", "play", "Start", "Actual start of an order, operation, step, or phase")}
+              ${signal("events", "end", "square-check-big", "End / completion", "Final completion or technically complete status")}
+              ${signal("events", "partial", "circle-dot-dashed", "Partial / progress", "Incremental confirmation before final completion")}
+            </div>
+          </section>
+          <section class="execution-dimension">
+            <div class="dimension-heading"><span>04</span><div><strong>Quantity outcomes</strong><small>Select every quantity received</small></div></div>
+            <div class="choice-grid compact execution-signals">
+              ${signal("quantities", "yield", "badge-check", "Yield / good quantity", "Accepted production quantity or process yield")}
+              ${signal("quantities", "scrap", "trash-2", "Scrap / reject", "Rejected quantity and optional reason code")}
+              ${signal("quantities", "rework", "rotate-ccw", "Rework", "Quantity routed back into correction or reprocessing")}
+              ${signal("quantities", "consumption", "package-minus", "Material consumption", "Actual component, ingredient, lot, or container usage")}
+              ${choiceTile("status-only", execution.quantitiesConfirmed && execution.quantities.length === 0, "activity", "Status only", "No execution quantities are supplied").replace("data-choice", "data-execution-quantity-none")}
+            </div>
+          </section>
+        </div>
+      `;
+    },
+    attach: (root) => {
+      root.querySelectorAll("[data-execution-group]").forEach((group) => {
+        group.querySelectorAll("[data-choice]").forEach((button) => button.addEventListener("click", () => {
+          state.execution[group.dataset.executionGroup] = button.dataset.choice;
+          render();
+        }));
+      });
+      ["level", "event", "quantity"].forEach((group) => {
+        root.querySelectorAll(`[data-execution-${group}]`).forEach((button) => button.addEventListener("click", () => {
+          const key = { level: "levels", event: "events", quantity: "quantities" }[group];
+          const selected = new Set(state.execution[key]);
+          selected.has(button.dataset[`execution${group[0].toUpperCase()}${group.slice(1)}`])
+            ? selected.delete(button.dataset[`execution${group[0].toUpperCase()}${group.slice(1)}`])
+            : selected.add(button.dataset[`execution${group[0].toUpperCase()}${group.slice(1)}`]);
+          state.execution[key] = [...selected];
+          if (group === "quantity") state.execution.quantitiesConfirmed = true;
+          render();
+        }));
+      });
+      root.querySelector("[data-execution-quantity-none]")?.addEventListener("click", () => {
+        state.execution.quantities = [];
+        state.execution.quantitiesConfirmed = true;
+        render();
+      });
     },
   },
   {
     id: "variant", phase: "Model", nav: "Try a variant",
     title: "Want to try a variant before committing?",
-    sub: "Branching lets you explore a change in isolation. Here: split Packaging into a dedicated Finished-Goods area — see the diff, then keep or revert.",
+    sub: "Branching lets you explore a taxonomy change in isolation. The example uses synthetic Packaging and Finished-Goods records, never customer master data.",
     hint: "Try it or skip to continue.",
     gate: () => state.variant === "kept" || state.variant === "reverted" || state.variant === "skipped",
     body: () => {
@@ -404,9 +849,9 @@ const steps = [
     },
   },
   {
-    id: "demo", phase: "Validate", nav: "Demo",
-    title: "Schedule the rush order.",
-    sub: () => `A rush ${profile().order.toLowerCase()} is due today and needs a packaging line. Pick where it runs — the model scores the choice.`,
+    id: "demo", phase: "Validate", nav: "Representative scenario",
+    title: "Validate with a synthetic scheduling scenario.",
+    sub: () => `A generated rush ${profile().order.toLowerCase()} needs representative packaging capacity. The scenario tests the configured logic without asking for customer orders or resources.`,
     hint: "Schedule the order to continue.",
     gate: () => !!state.demo,
     body: () => {
@@ -443,10 +888,15 @@ const steps = [
     body: () => {
       const r = readiness();
       const rows = [
-        ["Plant model", siteName() ? "done" : "open", siteName() ? `${siteName()} · ${areas().length} areas` : "Not named"],
-        ["Scheduling", state.planningMode ? "done" : "open", state.planningMode || "Not chosen"],
-        ["Work centers", state.lineDecision ? "done" : "open", state.lineDecision === "flag" ? "Line 3 flagged for cleanup" : state.lineDecision === "exclude" ? "Line 3 excluded" : "Unresolved"],
-        ["Demo evidence", state.demo ? "done" : "open", state.demo ? `${state.demo.score}% training score` : "Pending"],
+        ["Planning objective", state.scope ? "done" : "open", state.scope === "aps-ds" ? "Advanced Planning & Detailed Scheduling" : "Not selected"],
+        ["Operating archetypes", state.archetypes?.length ? "done" : "open", state.archetypes?.length ? archetypeSynthesis().title : "Not characterized"],
+        ["Industry context", state.industry ? "done" : "open", industry()?.name || "Not selected"],
+        ["Department taxonomy", state.departmentTypes?.length ? "done" : "open", state.departmentTypes?.length ? `${state.departmentTypes.length} semantic types selected` : "Not configured"],
+        ["Calendars & capacity", state.calendar?.layering ? "done" : "open", state.calendar?.layering ? `${calendarProfile().base} · ${state.calendar.pattern} · ${state.calendar.exceptions}` : "Not characterized"],
+        ["Resource taxonomy", state.resourceTypes?.length ? "done" : "open", state.resourceTypes?.length ? `${state.resourceTypes.length} capacity-object types selected` : "Not configured"],
+        ["BOM profile", state.bom?.source ? "done" : "open", state.bom?.source ? `${state.bom.structure} · ${state.bom.consumption} · ${state.bom.source}` : "Not characterized"],
+        ["Execution feedback", state.execution?.source ? "done" : "open", state.execution?.source ? `${executionSourceLabel()} · ${state.execution.events.join(", ")}` : "Not configured"],
+        ["Representative evidence", state.demo ? "done" : "open", state.demo ? `${state.demo.score}% scenario score` : "Pending"],
         ["Migration risk", "info", state.migration ? "S/4 migration on roadmap" : "No migration planned"],
       ];
       return `
@@ -476,13 +926,27 @@ const steps = [
     sub: "The journey ends where support begins. This exports the model, decisions, and evidence — managed services are out of scope.",
     body: () => {
       const decisions = Model.nodesOfType("decision");
+      const generated = representativeData();
       return `
         <div class="summary-grid">
-          <div class="summary-card"><span>Model</span><strong>${areas().length} areas · ${workcenters().length} ${escapeHtml(profile().resource.toLowerCase())}s</strong><small>${Model.events().length} committed events</small></div>
+          <div class="summary-card"><span>Objective</span><strong>${state.scope === "aps-ds" ? "APS / Detailed Scheduling" : "Pending"}</strong><small>hours-to-weeks planning horizon</small></div>
+          <div class="summary-card"><span>Industry</span><strong>${industry() ? escapeHtml(industry().name) : "Pending"}</strong><small>${industry() ? escapeHtml(industry().compliance) : "context not selected"}</small></div>
+          <div class="summary-card"><span>Representative data</span><strong>${generated.departments.length} departments · ${generated.resources.length} resources</strong><small>synthetic and replaceable</small></div>
+          <div class="summary-card"><span>BOM</span><strong>${state.bom?.structure ? escapeHtml(state.bom.structure) : "Pending"}</strong><small>${state.bom?.source ? escapeHtml(state.bom.source) : "integration grain not set"}</small></div>
+          <div class="summary-card"><span>Capacity</span><strong>${state.calendar?.layering ? escapeHtml(state.calendar.layering) : "Pending"}</strong><small>${state.calendar?.pattern ? escapeHtml(state.calendar.pattern) : "calendar pattern not set"}</small></div>
+          <div class="summary-card"><span>Execution</span><strong>${escapeHtml(executionSourceLabel())}</strong><small>${state.execution?.events?.length ? escapeHtml(state.execution.events.join(" · ")) : "feedback events not set"}</small></div>
           <div class="summary-card"><span>Decisions</span><strong>${decisions.length} governed</strong><small>${decisions.length ? "merge history travels with handoff" : "no branch merges"}</small></div>
           <div class="summary-card"><span>Evidence</span><strong>${state.demo ? state.demo.score + "% training" : "Pending"}</strong><small>${state.demo ? "seeds the support runbook" : "no scored scenario"}</small></div>
           <div class="summary-card"><span>Readiness</span><strong>${readiness()}%</strong><small>at handoff</small></div>
         </div>
+        <section class="generated-preview" aria-label="Generated representative dataset">
+          <div class="generated-heading"><div><span>Generated representative dataset</span><strong>${escapeHtml(generated.organization.name)}</strong></div><em>synthetic</em></div>
+          <div class="generated-columns">
+            <div><span>${escapeHtml(profile().area)} examples</span>${generated.departments.map((item) => `<code>${escapeHtml(item.id)}</code><small>${escapeHtml(item.name)}</small>`).join("") || "<small>No department types selected</small>"}</div>
+            <div><span>${escapeHtml(profile().resource)} examples</span>${generated.resources.map((item) => `<code>${escapeHtml(item.id)}</code><small>${escapeHtml(item.name)}</small>`).join("") || "<small>No resource types selected</small>"}</div>
+          </div>
+          <p>${escapeHtml(generated.replacementPolicy)}</p>
+        </section>
         <button class="ghost-btn wide" id="exportBtn" type="button"><i data-lucide="download"></i><span>Export handoff brief (JSON)</span></button>
       `;
     },
@@ -532,12 +996,14 @@ function renderRail() {
   let html = "";
   let lastPhase = null;
   steps.forEach((s, idx) => {
-    if (s.phase !== lastPhase) { html += `<p class="rail-phase">${escapeHtml(s.phase)}</p>`; lastPhase = s.phase; }
+    const phase = typeof s.phase === "function" ? s.phase() : s.phase;
+    const nav = typeof s.nav === "function" ? s.nav() : s.nav;
+    if (phase !== lastPhase) { html += `<p class="rail-phase">${escapeHtml(phase)}</p>`; lastPhase = phase; }
     const cls = state.done ? "done" : idx === state.i ? "current" : idx < state.i ? "done" : idx <= state.max ? "avail" : "locked";
     const icon = cls === "done" ? "circle-check" : cls === "current" ? "circle-dot" : cls === "locked" ? "lock" : "circle";
     html += `
       <button class="rail-step ${cls}" type="button" data-goto="${idx}" ${idx > state.max && !state.done ? "disabled" : ""}>
-        <i data-lucide="${icon}"></i><span>${escapeHtml(s.nav)}</span>
+        <i data-lucide="${icon}"></i><span>${escapeHtml(nav)}</span>
       </button>`;
   });
   rail.innerHTML = html;
@@ -561,7 +1027,7 @@ function renderCompletion() {
     <div class="complete">
       <div class="complete-mark"><i data-lucide="check"></i></div>
       <h2>Setup complete.</h2>
-      <p>${escapeHtml(siteName())} is modelled, validated at ${readiness()}% readiness, and ready to hand off. You can revisit any step from the rail.</p>
+      <p>The configuration is validated at ${readiness()}% readiness. Its representative dataset is synthetic and ready to be replaced with governed customer data during onboarding.</p>
       <button class="cta" id="reviewBtn" type="button"><i data-lucide="list-checks"></i><span>Review readiness</span></button>
     </div>
   `;
@@ -581,10 +1047,12 @@ function render() {
   // title/sub may be functions so they can reflect the live dialect.
   const title = typeof step.title === "function" ? step.title() : step.title;
   const sub = typeof step.sub === "function" ? step.sub() : step.sub;
+  const phase = typeof step.phase === "function" ? step.phase() : step.phase;
   $("#stageCount").textContent = `Step ${state.i + 1} of ${steps.length}`;
+  $("#stageBody").dataset.step = step.id;
   $("#stageBody").innerHTML = `
     <div class="step">
-      <p class="step-phase">${escapeHtml(step.phase)}</p>
+      <p class="step-phase">${escapeHtml(phase)}</p>
       <h2>${escapeHtml(title)}</h2>
       <p class="step-sub">${escapeHtml(sub)}</p>
       <div class="step-body">${step.body ? step.body() : ""}</div>
@@ -596,7 +1064,8 @@ function render() {
   $("#nextLabel").textContent = step.cta || "Continue";
   const ok = step.gate ? step.gate() : true;
   $("#nextBtn").disabled = !ok;
-  $("#footHint").textContent = ok ? "" : step.hint || "";
+  const hint = typeof step.hint === "function" ? step.hint() : step.hint;
+  $("#footHint").textContent = ok ? "" : hint || "";
 
   refreshIcons();
   save();
@@ -614,13 +1083,37 @@ function advance() {
 function exportBrief() {
   const brief = {
     product: "ImplementationOS for Manufacturing Software",
-    archetype: archetype()?.name,
+    planningObjective: planningLevels.find((item) => item.id === state.scope) || null,
+    industry: industry(),
+    archetypes: selectedArchetypes().map(({ id, name, mode: archetypeMode }) => ({ id, name, mode: archetypeMode })),
+    archetypeSynthesis: { ...archetypeSynthesis(), ...modeMix(), dominantLabel: mode().label },
     mode: mode().label,
     dialect: profile().badge,
-    site: siteName(),
-    areas: areas().map((a) => a.name),
-    workcenters: workcenters().map((w) => ({ name: w.name, area: areaName(w.areaId) })),
-    decisions: { lineIssue: state.lineDecision, variant: state.variant, migration: state.migration },
+    terminology: {
+      facility: profile().facility,
+      storage: profile().storage,
+      bin: profile().bin,
+      area: profile().area,
+      resource: profile().resource,
+      order: profile().order,
+      route: profile().route,
+      hierarchy: profile().hierarchy,
+    },
+    taxonomies: {
+      departments: selectedDepartmentTypes(),
+      resources: selectedResourceTypes(),
+    },
+    representativeDataset: representativeData(),
+    billOfMaterials: state.bom,
+    calendarAndCapacity: {
+      terminology: calendarProfile(),
+      profile: state.calendar,
+    },
+    executionFeedback: {
+      sourceLabel: executionSourceLabel(),
+      ...state.execution,
+    },
+    decisions: { variant: state.variant, migration: state.migration },
     demo: state.demo,
     readiness: `${readiness()}%`,
     governedDecisions: Model.nodesOfType("decision").map((d) => d.props),
