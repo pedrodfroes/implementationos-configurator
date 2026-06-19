@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ImplementationOS for Manufacturing Software</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+    <script src="./packs.js" defer></script>
+    <script src="./model.js" defer></script>
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div class="brand-block">
+          <p class="eyebrow">ImplementationOS</p>
+          <h1>APS implementation journey for manufacturing software teams.</h1>
+        </div>
+        <div class="toolbar" aria-label="Demo actions">
+          <span class="stage-pill" id="branchBadge" title="Active model branch">main</span>
+          <button class="icon-button" id="resetBtn" type="button" title="Reset demo" aria-label="Reset demo">
+            <i data-lucide="rotate-ccw"></i>
+          </button>
+          <button class="primary-button" id="exportBtn" type="button">
+            <i data-lucide="download"></i>
+            <span>Export brief</span>
+          </button>
+        </div>
+      </header>
+
+      <nav class="screen-tabs" id="screenTabs" aria-label="Demo screens">
+        <button class="screen-tab active" type="button" data-screen="journey">
+          <i data-lucide="route"></i>
+          <span>Journey</span>
+        </button>
+        <button class="screen-tab" type="button" data-screen="archetypes">
+          <i data-lucide="orbit"></i>
+          <span>Archetypes</span>
+        </button>
+        <button class="screen-tab" type="button" data-screen="data">
+          <i data-lucide="database"></i>
+          <span>Data Model</span>
+        </button>
+        <button class="screen-tab" type="button" data-screen="routing">
+          <i data-lucide="git-branch"></i>
+          <span>Routings</span>
+        </button>
+        <button class="screen-tab" type="button" data-screen="intelligence">
+          <i data-lucide="network"></i>
+          <span>Intelligence</span>
+        </button>
+        <button class="screen-tab" type="button" data-screen="delivery">
+          <i data-lucide="kanban"></i>
+          <span>Delivery</span>
+        </button>
+      </nav>
+
+      <section class="screen journey-screen active" id="journeyScreen" aria-label="Guided journey screen">
+        <div class="journey-layout">
+          <aside class="context-panel compact" aria-label="Project context">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Context</p>
+                <h2>ERP dialect</h2>
+              </div>
+              <span id="dialectBadge">JDE</span>
+            </div>
+
+            <label class="field">
+              <span>Source System</span>
+              <select id="erpProfile">
+                <option value="jde">JDE / classic work orders</option>
+                <option value="sap_pp">SAP ECC PP</option>
+                <option value="sap_pi">SAP ECC PP-PI</option>
+                <option value="s4">S/4HANA target state</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Implementation Domain</span>
+              <select id="domainProfile">
+                <option value="aps">APS</option>
+                <option value="mes">MES extension later</option>
+                <option value="mrp">MRP/MPS extension later</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Planning Archetype</span>
+              <select id="archetypeProfile"></select>
+            </label>
+
+            <div class="toggle-line">
+              <span>S/4 migration in roadmap</span>
+              <label class="switch">
+                <input id="futureMigration" type="checkbox" checked />
+                <span></span>
+              </label>
+            </div>
+
+            <details class="context-details">
+              <summary>
+                <i data-lucide="book-open"></i>
+                <span>Terminology</span>
+              </summary>
+              <dl id="termList"></dl>
+            </details>
+
+            <details class="context-details">
+              <summary>
+                <i data-lucide="brain"></i>
+                <span>Project memory</span>
+              </summary>
+              <ul id="memoryList"></ul>
+            </details>
+          </aside>
+
+          <section class="journey-panel" aria-label="Guided implementation journey">
+            <section class="node-vault compact-vault" aria-label="Implementation graph preview">
+              <div class="vault-heading">
+                <div>
+                  <p class="eyebrow">Live Model</p>
+                  <h2>Implementation graph</h2>
+                </div>
+                <span id="graphFocusBadge">Setup</span>
+              </div>
+              <div class="node-graph compact" id="journeyGraph"></div>
+            </section>
+
+            <nav class="journey-map" id="journeyMap" aria-label="Journey steps"></nav>
+
+            <section class="journey-stage" id="journeyStage" aria-live="polite"></section>
+
+            <footer class="stage-controls">
+              <button class="secondary-button" id="backBtn" type="button">
+                <i data-lucide="arrow-left"></i>
+                <span>Back</span>
+              </button>
+              <button class="primary-button" id="nextBtn" type="button">
+                <span>Next</span>
+                <i data-lucide="arrow-right"></i>
+              </button>
+            </footer>
+          </section>
+        </div>
+      </section>
+
+      <section class="screen intelligence-screen" id="intelligenceScreen" aria-label="Implementation intelligence screen">
+        <section class="project-strip" aria-label="Project snapshot">
+          <article>
+            <span>Template</span>
+            <strong>APS Pilot</strong>
+            <small id="erpMini">JDE current state</small>
+          </article>
+          <article title="Semantic object count is intentionally shown on the intelligence screen, not during area definition.">
+            <span>Semantic Objects</span>
+            <strong id="objectCount">18</strong>
+            <small>linked to project memory</small>
+          </article>
+          <article>
+            <span>Data Readiness</span>
+            <strong id="dataReadiness">42%</strong>
+            <small id="dataStageLabel">Profiled mock plus sample extract</small>
+          </article>
+          <article>
+            <span>Training Signal</span>
+            <strong id="trainingScore">Pending</strong>
+            <small id="trainingNote">one scheduling puzzle ready</small>
+          </article>
+        </section>
+
+        <div class="intelligence-grid">
+          <section class="graph-card large-card" aria-label="Semantic implementation graph">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Semantic Layer</p>
+                <h2>Impact graph</h2>
+              </div>
+              <span id="riskBadge">2 risks</span>
+            </div>
+            <div class="node-graph intelligence" id="intelligenceGraph"></div>
+          </section>
+
+          <section class="impact-card">
+            <h3>Latest Impact</h3>
+            <ul id="impactList"></ul>
+          </section>
+
+          <section class="meeting-card">
+            <h3>Meeting Intelligence</h3>
+            <div id="meetingItems"></div>
+          </section>
+
+          <section class="impact-card" id="branchPanel" aria-label="Model branches and decision log"></section>
+        </div>
+      </section>
+
+      <section class="screen archetypes-screen" id="archetypesScreen" aria-label="Planning archetypes screen">
+        <div id="archetypesStage"></div>
+      </section>
+
+      <section class="screen data-screen" id="dataScreen" aria-label="Implementation data model screen">
+        <div id="dataModelStage"></div>
+      </section>
+
+      <section class="screen routing-screen" id="routingScreen" aria-label="Pharma routing library screen">
+        <div id="routingStage"></div>
+      </section>
+
+      <section class="screen delivery-screen" id="deliveryScreen" aria-label="Delivery cockpit screen">
+        <div id="deliveryStage"></div>
+      </section>
+    </main>
+  </body>
+</html>
