@@ -3804,26 +3804,24 @@ body.genesis-open {
 
 @media (min-width: 861px) {
   .stage-body[data-step="archetype"] {
-    max-width: none;
-    padding-left: clamp(28px, 3vw, 56px);
-    padding-right: clamp(28px, 3vw, 56px);
+    max-width: 1080px;
   }
 
   .stage-body[data-step="archetype"] .step-sub {
-    margin-bottom: 18px;
-    max-width: 760px;
+    margin-bottom: 16px;
+    max-width: 620px;
   }
 
   .stage-body[data-step="archetype"] .pick-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
     max-height: none;
     overflow: visible;
   }
-}
 
-@media (min-width: 861px) and (max-width: 1280px) {
-  .stage-body[data-step="archetype"] .pick-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .stage-body[data-step="archetype"] .pick-card {
+    padding: 10px 12px;
+    border-radius: 8px;
   }
 }
 
