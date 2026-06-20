@@ -16,7 +16,7 @@ const steps = [
         <i data-lucide="route"></i>
       </div>
       <ul class="welcome-list">
-        <li><i data-lucide="target"></i><span>Start from the planning archetype, not the industry.</span></li>
+        <li><i data-lucide="target"></i><span>Use industry context to narrow the operating archetypes coherently.</span></li>
         <li><i data-lucide="git-branch"></i><span>Try changes on a branch before committing them.</span></li>
         <li><i data-lucide="gauge"></i><span>Watch readiness build as you make each decision.</span></li>
       </ul>
