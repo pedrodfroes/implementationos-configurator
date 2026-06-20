@@ -4460,6 +4460,59 @@ body.genesis-open {
   line-height: 1.35;
 }
 
+.attr-suggested-label {
+  margin: 16px 0 7px;
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.attr-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 820px;
+}
+
+.attr-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 0.74rem;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.attr-chip i { width: 14px; height: 14px; }
+
+.attr-chip:hover { border-color: var(--teal); }
+
+.attr-chip.active {
+  border-color: var(--teal);
+  background: var(--teal-soft);
+  color: var(--teal);
+  font-weight: 600;
+}
+
+.attr-chip.none { color: var(--muted); }
+.attr-chip.none.active { background: var(--surface); color: var(--ink); border-color: var(--muted); }
+
+/* Conditional "which attributes drive transitions" panel, revealed when the
+   attribute-driven driver is selected on the setup/cleaning step. */
+.transition-attr-link {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+}
+.transition-attr-link .attr-suggested-label { margin-top: 0; }
+
 .representative-note {
   display: flex;
   align-items: center;
@@ -4474,6 +4527,10 @@ body.genesis-open {
   height: 16px;
   color: var(--violet);
 }
+
+.attribute-lens { align-items: flex-start; line-height: 1.4; }
+.attribute-lens b { color: var(--ink); }
+.attribute-lens i { flex: 0 0 16px; margin-top: 1px; }
 
 .choice-grid {
   display: grid;
