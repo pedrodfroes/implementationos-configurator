@@ -3523,7 +3523,8 @@ body.genesis-open {
 .installer {
   display: grid;
   grid-template-columns: 272px 1fr;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .rail {
@@ -3532,6 +3533,8 @@ body.genesis-open {
   padding: 26px 20px;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .rail-brand strong {
@@ -3664,7 +3667,9 @@ body.genesis-open {
 .stage-wrap {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
+  overflow: hidden;
   background: #f6f8fa;
 }
 
@@ -3712,13 +3717,15 @@ body.genesis-open {
 
 .stage-body {
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: safe center;
   padding: 8px 40px;
   max-width: 940px;
   width: 100%;
-  margin: 0;
+  margin: 0 auto;
 }
 
 .step-phase {
@@ -3752,7 +3759,7 @@ body.genesis-open {
   padding: 18px 40px 28px;
   max-width: 940px;
   width: 100%;
-  margin: 0;
+  margin: 0 auto;
 }
 
 .foot-right {
