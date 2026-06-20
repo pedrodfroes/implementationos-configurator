@@ -157,6 +157,11 @@ function exportBrief() {
       confirmed: state.supplies.confirmed,
       profiles: supplyProfiles().map((profile) => ({ ...profile, policy: supplyPolicy(profile) })),
     },
+    workforcePlanning: {
+      confirmed: state.workforce.confirmed,
+      intensity: laborIntensity(),
+      capabilities: workforceCapabilities.map((cap) => ({ id: cap.id, name: cap.name, scope: workforceScope(cap) })),
+    },
     calendarAndCapacity: {
       terminology: calendarProfile(),
       profile: state.calendar,

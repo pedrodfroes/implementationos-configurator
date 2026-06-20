@@ -43,6 +43,18 @@ function supplyProfiles() {
   return [...ids].map((id) => ({ id, ...supplyProfileCatalog[id] })).filter((item) => item.name);
 }
 function supplyPolicy(profile) { return state.supplies?.policies?.[profile.id] || profile.recommended; }
+function laborIntensity() {
+  const rank = { core: 3, supporting: 2, minimal: 1 };
+  let best = 0, label = "supporting";
+  selectedArchetypes().forEach((a) => {
+    const tier = archetypeLaborIntensity[a.id] || "supporting";
+    if (rank[tier] > best) { best = rank[tier]; label = tier; }
+  });
+  return label;
+}
+function workforceScope(cap) {
+  return state.workforce?.scopes?.[cap.id] || workforceScopeMatrix[cap.id]?.[laborIntensity()] || "basic";
+}
 function executionSourceLabel() {
   return { erp: `${profile().badge} confirmations`, mes: "MES execution events", hybrid: `Hybrid MES + ${profile().badge}` }[state.execution?.source] || "Not configured";
 }
@@ -131,6 +143,7 @@ function readiness() {
   if (transitionsConfigured()) s += 8;
   if (state.bom?.structure && state.bom?.featuresConfirmed && state.bom?.consumption && state.bom?.source) s += 8;
   if (state.supplies?.confirmed) s += 6;
+  if (state.workforce?.confirmed) s += 6;
   if (state.execution?.source && state.execution?.levels?.length && state.execution?.events?.length && state.execution?.quantitiesConfirmed) s += 8;
   if (state.variant && state.variant !== "active") s += 6;
   if (state.migration) s -= 4;

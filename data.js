@@ -157,6 +157,32 @@ const industrySupplyProfiles = {
   "operations-services": ["qualified-material", "long-lead-component", "interplant-transfer", "standard-packaging"],
 };
 
+const workforceCapabilities = [
+  { id: "qualification", name: "Qualification management", icon: "graduation-cap", note: "A qualification matrix maps who can run which workstation, so planning never assigns work to people who cannot perform it.", points: ["Qualification matrix per workstation", "Flexible qualification levels", "Automatic consideration in planning"] },
+  { id: "absence", name: "Absence management", icon: "calendar-off", note: "Real availability after leave, holidays, and training keeps planned capacity honest and feeds absence-rate analysis.", points: ["Transparent availability overview", "Simple absence recording", "Automatic planning integration", "Absence-rate reporting & causes"] },
+  { id: "deployment", name: "Workforce deployment planning", icon: "users", note: "Assign qualified, available people to shifts with suggestions and reusable schedules instead of manual rostering.", points: ["Automatic employee assignment", "Drag-and-drop planning", "Qualified-employee suggestions", "Reuse of existing schedules"] },
+  { id: "shift", name: "Shift planning", icon: "calendar-clock", note: "Maintain shift models and recurring patterns, including overlapping shifts, with team- and workstation-level reporting.", points: ["Bulk shift changes", "Recurring shift patterns", "Employee / team / workstation reports", "Multiple & overlapping shift models"] },
+];
+
+// People are the binding constraint in service and project work; process
+// plants are asset-bound and treat workforce as shift coverage. Intensity is
+// the highest tier across the selected archetypes.
+const archetypeLaborIntensity = {
+  "field-service": "core", "healthcare-capacity": "core", "maintenance-turnaround": "core",
+  "construction-project": "core", "cto-eto": "core", "job-shop": "core",
+  "discrete-assembly": "supporting", "flow-shop": "supporting", "semiconductor-fab": "supporting",
+  "distribution-logistics": "supporting", "mining-primary": "supporting", "packaging-postponement": "supporting",
+  "batch-campaign": "minimal", "continuous-process": "minimal", "perishable-food": "minimal", "maturation-aging": "minimal",
+};
+
+// Recommended configuration depth per capability, by derived labor intensity.
+const workforceScopeMatrix = {
+  qualification: { core: "full", supporting: "full", minimal: "basic" },
+  absence: { core: "full", supporting: "basic", minimal: "basic" },
+  deployment: { core: "full", supporting: "basic", minimal: "out" },
+  shift: { core: "full", supporting: "full", minimal: "full" },
+};
+
 const departmentTaxonomy = [
   { id: "production", name: "Production / Processing", icon: "factory", note: "Core conversion, processing, or assembly activities" },
   { id: "packaging", name: "Packaging / Finishing", icon: "package-check", note: "Packing, labeling, finishing, and late-stage differentiation" },

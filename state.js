@@ -44,6 +44,7 @@ const initialState = {
     source: null,
   },
   supplies: { policies: {}, confirmed: false },
+  workforce: { scopes: {}, confirmed: false },
   execution: {
     source: null,
     levels: [],
@@ -73,6 +74,11 @@ function load() {
       if (!("supplies" in saved) && Number(saved.max || 0) >= 11) {
         state.i = 11;
         state.max = Math.max(11, Number(state.max || 0) + 1);
+      }
+      if (!("workforce" in saved)) {
+        const wfIdx = steps.findIndex((step) => step.id === "workforce");
+        if (wfIdx >= 0 && Number(saved.i || 0) >= wfIdx) state.i = Number(saved.i) + 1;
+        if (wfIdx >= 0 && Number(saved.max || 0) >= wfIdx) state.max = Number(saved.max) + 1;
       }
       if (!Array.isArray(saved.archetypes) && saved.archetype) state.archetypes = [saved.archetype];
       if (!("scope" in saved)) {

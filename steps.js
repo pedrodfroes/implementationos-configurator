@@ -89,6 +89,7 @@ const steps = [
           selected.has(b.dataset.arch) ? selected.delete(b.dataset.arch) : selected.add(b.dataset.arch);
           state.archetypes = [...selected];
           state.erp = mode().erp;
+          state.workforce.confirmed = false;
           render();
         })
       );
@@ -576,6 +577,61 @@ const steps = [
     },
   },
   {
+    id: "workforce", phase: "Model", nav: "Workforce planning",
+    title: "How much workforce planning does this need?",
+    sub: "Labor-bound operations plan people the way others plan machines. The recommended depth follows your operating archetypes — confirm or override how far each workforce capability is configured.",
+    hint: "Review the recommended depth and confirm the workforce policy.",
+    gate: () => !!state.workforce?.confirmed,
+    body: () => {
+      const caps = workforceCapabilities;
+      const counts = caps.reduce((result, cap) => {
+        result[workforceScope(cap)] += 1;
+        return result;
+      }, { full: 0, basic: 0, out: 0 });
+      const intensityLabel = {
+        core: "Labor-bound — people are the binding constraint",
+        supporting: "Mixed — labor matters alongside assets",
+        minimal: "Asset-bound — workforce is mostly shift coverage",
+      }[laborIntensity()];
+      return `
+        <div class="workforce-synthesis">
+          <div><span>Archetype-informed depth</span><strong>${escapeHtml(intensityLabel)}</strong></div>
+          <div class="workforce-counts"><b class="full">${counts.full} full</b><b class="basic">${counts.basic} basic</b><b class="out">${counts.out} out</b></div>
+        </div>
+        <div class="workforce-matrix" role="table" aria-label="Workforce planning policy">
+          <div class="workforce-header" role="row"><span>Workforce capability</span><span>What it covers</span><span>Configuration depth</span></div>
+          ${caps.map((cap) => {
+            const scope = workforceScope(cap);
+            return `<div class="workforce-row" role="row">
+              <div class="workforce-identity"><i data-lucide="${cap.icon}"></i><span><strong>${escapeHtml(cap.name)}</strong><small>${escapeHtml(cap.note)}</small></span></div>
+              <div class="workforce-points">${cap.points.map((point) => `<span>${escapeHtml(point)}</span>`).join("")}</div>
+              <div class="workforce-scope" aria-label="Depth for ${escapeHtml(cap.name)}">
+                <button type="button" class="${scope === "full" ? "active full" : ""}" data-workforce-cap="${cap.id}" data-workforce-scope="full" title="Fully configured and enforced in planning">Full</button>
+                <button type="button" class="${scope === "basic" ? "active basic" : ""}" data-workforce-cap="${cap.id}" data-workforce-scope="basic" title="Lightweight: tracked but not deeply automated">Basic</button>
+                <button type="button" class="${scope === "out" ? "active out" : ""}" data-workforce-cap="${cap.id}" data-workforce-scope="out" title="Out of scope for this implementation">Out</button>
+              </div>
+            </div>`;
+          }).join("")}
+        </div>
+        <div class="workforce-confirmation">
+          <div><i data-lucide="info"></i><p><strong>Full</strong> means APS plans this capability with qualifications and availability enforced. <strong>Out</strong> means the client handles it outside the scheduling model.</p></div>
+          <button type="button" class="${state.workforce.confirmed ? "active" : ""}" id="confirmWorkforce"><i data-lucide="${state.workforce.confirmed ? "circle-check" : "shield-check"}"></i><span>${state.workforce.confirmed ? "Policy confirmed" : "Confirm workforce policy"}</span></button>
+        </div>
+      `;
+    },
+    attach: (root) => {
+      root.querySelectorAll("[data-workforce-cap]").forEach((button) => button.addEventListener("click", () => {
+        state.workforce.scopes[button.dataset.workforceCap] = button.dataset.workforceScope;
+        state.workforce.confirmed = false;
+        render();
+      }));
+      root.querySelector("#confirmWorkforce")?.addEventListener("click", () => {
+        state.workforce.confirmed = true;
+        render();
+      });
+    },
+  },
+  {
     id: "execution", phase: "Model", nav: "Execution feedback",
     title: "How does actual execution return to planning?",
     sub: () => `Configure the feedback contract separately from the ${profile().route.toLowerCase()}. MES events and ${profile().badge} confirmations may describe the same work at different levels and times.`,
@@ -748,6 +804,7 @@ const steps = [
         ["Setup & changeovers", transitionsConfigured() ? "done" : "open", state.transitions?.types?.length ? `${transitionTypes.filter((x) => state.transitions.types.includes(x.id)).map((x) => x.name).join(", ")} · ${state.transitions.triggers.length} trigger${state.transitions.triggers.length === 1 ? "" : "s"}` : "Not characterized"],
         ["BOM profile", state.bom?.source ? "done" : "open", state.bom?.source ? `${state.bom.structure} · ${state.bom.consumption} · ${state.bom.source}` : "Not characterized"],
         ["Critical supplies", state.supplies?.confirmed ? "done" : "open", state.supplies?.confirmed ? `${supplyProfiles().filter((profile) => supplyPolicy(profile) === "hard").length} hard constraints confirmed` : "Policy not reviewed"],
+        ["Workforce planning", state.workforce?.confirmed ? "done" : "open", state.workforce?.confirmed ? `${workforceCapabilities.filter((cap) => workforceScope(cap) === "full").length} capabilities in full scope` : "Policy not reviewed"],
         ["Execution feedback", state.execution?.source ? "done" : "open", state.execution?.source ? `${executionSourceLabel()} · ${state.execution.events.join(", ")}` : "Not configured"],
         ["Migration risk", "info", state.migration ? "S/4 migration on roadmap" : "No migration planned"],
       ];
@@ -789,6 +846,7 @@ const steps = [
           <div class="summary-card"><span>Setup & cleaning</span><strong>${state.transitions?.types?.length ? `${state.transitions.types.length} transition type${state.transitions.types.length === 1 ? "" : "s"}` : "Pending"}</strong><small>${state.transitions?.concurrency ? escapeHtml(transitionConcurrency.find((x) => x.id === state.transitions.concurrency)?.name || "") : "concurrency not set"}</small></div>
           <div class="summary-card"><span>BOM</span><strong>${state.bom?.structure ? escapeHtml(state.bom.structure) : "Pending"}</strong><small>${state.bom?.source ? escapeHtml(state.bom.source) : "integration grain not set"}</small></div>
           <div class="summary-card"><span>Critical supplies</span><strong>${state.supplies?.confirmed ? `${supplyProfiles().filter((profile) => supplyPolicy(profile) === "hard").length} hard constraints` : "Pending"}</strong><small>${state.supplies?.confirmed ? "PO, transfer, stock, shelf-life and storage policy" : "supply policy not reviewed"}</small></div>
+          <div class="summary-card"><span>Workforce planning</span><strong>${state.workforce?.confirmed ? `${workforceCapabilities.filter((cap) => workforceScope(cap) === "full").length} full-scope capabilities` : "Pending"}</strong><small>${state.workforce?.confirmed ? "qualification, absence, deployment and shift policy" : "workforce policy not reviewed"}</small></div>
           <div class="summary-card"><span>Capacity</span><strong>${state.calendar?.layering ? escapeHtml(state.calendar.layering) : "Pending"}</strong><small>${state.calendar?.pattern ? escapeHtml(state.calendar.pattern) : "calendar pattern not set"}</small></div>
           <div class="summary-card"><span>Execution</span><strong>${escapeHtml(executionSourceLabel())}</strong><small>${state.execution?.events?.length ? escapeHtml(state.execution.events.join(" · ")) : "feedback events not set"}</small></div>
           <div class="summary-card"><span>Decisions</span><strong>${decisions.length} governed</strong><small>${decisions.length ? "merge history travels with handoff" : "no branch merges"}</small></div>
