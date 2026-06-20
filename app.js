@@ -172,6 +172,17 @@ const industrySupplyProfiles = {
   "operations-services": ["qualified-material", "long-lead-component", "interplant-transfer", "standard-packaging"],
 };
 
+const volumeStorageBehaviors = [
+  { id: "dynamic-hold", icon: "pause", name: "Independent inflow, hold, and outflow", note: "Storage duration is schedule-dependent; feeding and consuming operations have independent timing and rates." },
+  { id: "single-material", icon: "circle-dot", name: "Single-material occupancy", note: "Any occupied volume can reserve the whole vessel against other materials or batches until empty and released." },
+  { id: "buffer", icon: "waves", name: "Buffer behavior", note: "Minimum fill, maximum heel, multiple inflows/outflows, and unequal rates protect upstream or downstream throughput." },
+  { id: "pipe-network", icon: "git-fork", name: "Pipe and transfer topology", note: "Physical connections, shared-line capacity, simultaneous occupation, flow rates, and product compatibility constrain routing." },
+  { id: "attribute-cleaning", icon: "sparkles", name: "Attribute-driven cleaning", note: "Cleaning depends on sequence attributes such as allergen, color, quality, brand, or lot rather than an unmaintainable SKU matrix." },
+  { id: "size-batch", icon: "maximize-2", name: "Tank size and dynamic batch sizing", note: "Different capacities, formula scaling, due dates, and future demand determine vessel choice and whether batches split." },
+  { id: "eligibility", icon: "list-checks", name: "Tank eligibility and auxiliary resources", note: "Products use overlapping tank groups and may also require stirrers, tools, CIP sets, operators, or QA standing time." },
+  { id: "state-change", icon: "refresh-cw", name: "Material state transformation", note: "Fermentation, maturation, incubation, assay, or QA release can change identity, quantity, status, and earliest outflow." },
+];
+
 const departmentTaxonomy = [
   { id: "production", name: "Production / Processing", icon: "factory", note: "Core conversion, processing, or assembly activities" },
   { id: "packaging", name: "Packaging / Finishing", icon: "package-check", note: "Packing, labeling, finishing, and late-stage differentiation" },
@@ -236,6 +247,7 @@ const initialState = {
     source: null,
   },
   supplies: { policies: {}, confirmed: false },
+  volumeStorage: { present: null, behaviors: [], confirmed: false },
   execution: {
     source: null,
     levels: [],
@@ -266,6 +278,10 @@ function load() {
       if (!("supplies" in saved) && Number(saved.max || 0) >= 11) {
         state.i = 11;
         state.max = Math.max(11, Number(state.max || 0) + 1);
+      }
+      if (!("volumeStorage" in saved) && Number(saved.max || 0) >= 10) {
+        state.i = 10;
+        state.max = Math.max(10, Number(state.max || 0) + 1);
       }
       if (!Array.isArray(saved.archetypes) && saved.archetype) state.archetypes = [saved.archetype];
       if (!("scope" in saved)) {
@@ -341,6 +357,10 @@ function supplyProfiles() {
   return [...ids].map((id) => ({ id, ...supplyProfileCatalog[id] })).filter((item) => item.name);
 }
 function supplyPolicy(profile) { return state.supplies?.policies?.[profile.id] || profile.recommended; }
+function volumeStorageRecommended() {
+  const processSectors = new Set(["food-beverage", "pharma", "chemicals", "metals-mining", "building-materials", "packaging", "energy-services"]);
+  return selectedIndustryContexts().some((context) => processSectors.has(context.industry));
+}
 function executionSourceLabel() {
   return { erp: `${profile().badge} confirmations`, mes: "MES execution events", hybrid: `Hybrid MES + ${profile().badge}` }[state.execution?.source] || "Not configured";
 }
@@ -401,6 +421,7 @@ function readiness() {
   if (state.calendar?.layering && state.calendar?.pattern && state.calendar?.exceptions && state.calendar?.modifiersConfirmed) s += 8;
   if (state.constraint) s += 6;
   if (state.resourceTypes?.length) s += 10;
+  if (state.volumeStorage?.present === false || state.volumeStorage?.confirmed) s += 6;
   if (state.bom?.structure && state.bom?.featuresConfirmed && state.bom?.consumption && state.bom?.source) s += 8;
   if (state.supplies?.confirmed) s += 6;
   if (state.execution?.source && state.execution?.levels?.length && state.execution?.events?.length && state.execution?.quantitiesConfirmed) s += 8;
@@ -779,6 +800,55 @@ const steps = [
     },
   },
   {
+    id: "volume-storage", phase: "Model", nav: "Volume storage",
+    title: "Do tanks or other volume assets shape feasibility?",
+    sub: "Model tanks, silos, vats, drums, bins, and connected buffers as schedule-dependent volume resources - not as warehouses or ordinary machines.",
+    hint: "Confirm whether volume-storage scheduling is in scope and review its behaviors.",
+    gate: () => state.volumeStorage?.present === false || !!(state.volumeStorage?.present && state.volumeStorage?.confirmed && state.volumeStorage?.behaviors?.length),
+    body: () => {
+      const storage = state.volumeStorage || initialState.volumeStorage;
+      return `
+        ${volumeStorageRecommended() ? `<div class="volume-recommendation"><i data-lucide="sparkles"></i><span><strong>Recommended from industry coverage</strong>Process-oriented contexts commonly require explicit volume-storage scheduling.</span></div>` : ""}
+        <div class="volume-presence" role="group" aria-label="Volume storage scope">
+          <button type="button" class="${storage.present === true ? "active" : ""}" data-volume-present="true" aria-pressed="${storage.present === true}"><i data-lucide="cylinder"></i><span><strong>Volume assets are in scope</strong><small>Tanks, silos, vats, drums, bins, or intermediate buffers affect feasibility</small></span></button>
+          <button type="button" class="${storage.present === false ? "active" : ""}" data-volume-present="false" aria-pressed="${storage.present === false}"><i data-lucide="circle-slash-2"></i><span><strong>Not relevant to this project</strong><small>Materials use ordinary inventory locations or non-volume resources</small></span></button>
+        </div>
+        ${storage.present ? `
+          <div class="volume-heading"><div><span>Tank scheduling behaviors</span><strong>${storage.behaviors.length} of ${volumeStorageBehaviors.length} represented</strong></div><button type="button" id="selectAllVolume">${storage.behaviors.length === volumeStorageBehaviors.length ? "Clear all" : "Select complete model"}</button></div>
+          <div class="volume-grid">
+            ${volumeStorageBehaviors.map((behavior, index) => `<button type="button" class="volume-behavior${storage.behaviors.includes(behavior.id) ? " active" : ""}" data-volume-behavior="${behavior.id}" aria-pressed="${storage.behaviors.includes(behavior.id)}"><span>${String(index + 1).padStart(2, "0")}</span><i data-lucide="${behavior.icon}"></i><div><strong>${escapeHtml(behavior.name)}</strong><small>${escapeHtml(behavior.note)}</small></div><i data-lucide="check"></i></button>`).join("")}
+          </div>
+          <div class="volume-confirmation"><p><strong>Avoid fixed durations and rules of thumb.</strong> Feasible schedules must dynamically couple occupancy, quantity, topology, sequence, and product state.</p><button type="button" class="${storage.confirmed ? "active" : ""}" id="confirmVolume" ${storage.behaviors.length ? "" : "disabled"}><i data-lucide="${storage.confirmed ? "circle-check" : "shield-check"}"></i><span>${storage.confirmed ? "Volume model confirmed" : "Confirm volume model"}</span></button></div>
+        ` : ""}
+      `;
+    },
+    attach: (root) => {
+      root.querySelectorAll("[data-volume-present]").forEach((button) => button.addEventListener("click", () => {
+        const present = button.dataset.volumePresent === "true";
+        state.volumeStorage.present = present;
+        state.volumeStorage.behaviors = present ? [...volumeStorageBehaviors.map((item) => item.id)] : [];
+        state.volumeStorage.confirmed = !present;
+        render();
+      }));
+      root.querySelectorAll("[data-volume-behavior]").forEach((button) => button.addEventListener("click", () => {
+        const selected = new Set(state.volumeStorage.behaviors);
+        selected.has(button.dataset.volumeBehavior) ? selected.delete(button.dataset.volumeBehavior) : selected.add(button.dataset.volumeBehavior);
+        state.volumeStorage.behaviors = [...selected];
+        state.volumeStorage.confirmed = false;
+        render();
+      }));
+      root.querySelector("#selectAllVolume")?.addEventListener("click", () => {
+        state.volumeStorage.behaviors = state.volumeStorage.behaviors.length === volumeStorageBehaviors.length ? [] : volumeStorageBehaviors.map((item) => item.id);
+        state.volumeStorage.confirmed = false;
+        render();
+      });
+      root.querySelector("#confirmVolume")?.addEventListener("click", () => {
+        state.volumeStorage.confirmed = true;
+        render();
+      });
+    },
+  },
+  {
     id: "bom", phase: "Model", nav: "BOM profile",
     title: "How does the product structure reach planning?",
     sub: () => `Characterize the ${profile().route.toLowerCase()} and component model across four independent dimensions. APS should preserve what matters without assuming every ERP sends a clean master BOM.`,
@@ -1098,6 +1168,7 @@ const steps = [
         ["Department taxonomy", state.departmentTypes?.length ? "done" : "open", state.departmentTypes?.length ? `${state.departmentTypes.length} semantic types selected` : "Not configured"],
         ["Calendars & capacity", state.calendar?.layering ? "done" : "open", state.calendar?.layering ? `${calendarProfile().base} · ${state.calendar.pattern} · ${state.calendar.exceptions}` : "Not characterized"],
         ["Resource taxonomy", state.resourceTypes?.length ? "done" : "open", state.resourceTypes?.length ? `${state.resourceTypes.length} capacity-object types selected` : "Not configured"],
+        ["Volume storage", state.volumeStorage?.present === false || state.volumeStorage?.confirmed ? "done" : "open", state.volumeStorage?.present === false ? "Not in scope" : state.volumeStorage?.confirmed ? `${state.volumeStorage.behaviors.length} tank behaviors modeled` : "Not characterized"],
         ["BOM profile", state.bom?.source ? "done" : "open", state.bom?.source ? `${state.bom.structure} · ${state.bom.consumption} · ${state.bom.source}` : "Not characterized"],
         ["Critical supplies", state.supplies?.confirmed ? "done" : "open", state.supplies?.confirmed ? `${supplyProfiles().filter((profile) => supplyPolicy(profile) === "hard").length} hard constraints confirmed` : "Policy not reviewed"],
         ["Execution feedback", state.execution?.source ? "done" : "open", state.execution?.source ? `${executionSourceLabel()} · ${state.execution.events.join(", ")}` : "Not configured"],
@@ -1137,6 +1208,7 @@ const steps = [
           <div class="summary-card"><span>Objective</span><strong>${state.scope === "aps-ds" ? "APS / Detailed Scheduling" : "Pending"}</strong><small>hours-to-weeks planning horizon</small></div>
           <div class="summary-card"><span>Industry coverage</span><strong>${industryLabel() ? escapeHtml(industryLabel()) : "Pending"}</strong><small>${selectedIndustryContexts().length ? escapeHtml(selectedIndustryContexts().map((context) => context.specialty).join(" · ")) : "context not selected"}</small></div>
           <div class="summary-card"><span>Representative data</span><strong>${generated.departments.length} departments · ${generated.resources.length} resources</strong><small>synthetic and replaceable</small></div>
+          <div class="summary-card"><span>Volume storage</span><strong>${state.volumeStorage?.present ? `${state.volumeStorage.behaviors.length} behaviors` : state.volumeStorage?.present === false ? "Not in scope" : "Pending"}</strong><small>${state.volumeStorage?.present ? "dynamic occupancy, flow and eligibility model" : "tank scheduling profile"}</small></div>
           <div class="summary-card"><span>BOM</span><strong>${state.bom?.structure ? escapeHtml(state.bom.structure) : "Pending"}</strong><small>${state.bom?.source ? escapeHtml(state.bom.source) : "integration grain not set"}</small></div>
           <div class="summary-card"><span>Critical supplies</span><strong>${state.supplies?.confirmed ? `${supplyProfiles().filter((profile) => supplyPolicy(profile) === "hard").length} hard constraints` : "Pending"}</strong><small>${state.supplies?.confirmed ? "PO, transfer, stock, shelf-life and storage policy" : "supply policy not reviewed"}</small></div>
           <div class="summary-card"><span>Capacity</span><strong>${state.calendar?.layering ? escapeHtml(state.calendar.layering) : "Pending"}</strong><small>${state.calendar?.pattern ? escapeHtml(state.calendar.pattern) : "calendar pattern not set"}</small></div>
@@ -1318,6 +1390,10 @@ function exportBrief() {
     },
     representativeDataset: representativeData(),
     billOfMaterials: state.bom,
+    volumeStorage: {
+      ...state.volumeStorage,
+      behaviorDetails: volumeStorageBehaviors.filter((behavior) => state.volumeStorage.behaviors.includes(behavior.id)),
+    },
     criticalSupplies: {
       confirmed: state.supplies.confirmed,
       profiles: supplyProfiles().map((profile) => ({ ...profile, policy: supplyPolicy(profile) })),
