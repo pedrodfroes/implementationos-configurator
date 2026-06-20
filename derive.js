@@ -75,7 +75,8 @@ function itemTerm() {
 }
 function qualityLens() {
   const processMode = modeMix().dominant === "process";
-  const regulated = ["pharma", "food-beverage", "medical-devices", "chemicals", "pesticides"].includes(state.industry);
+  const regulatedSectors = ["pharma", "food-beverage", "medical-devices", "chemicals", "pesticides"];
+  const regulated = selectedIndustryContexts().some((context) => regulatedSectors.includes(context.industry));
   return processMode || regulated;
 }
 // Every attribute the user picked across all families — feeds the transitions

@@ -944,8 +944,22 @@ function bindChoices(root, fn) {
 
 // ── Item-attribute steps (one Model link per family) ─────────────────
 function attributeExamplesFor(family) {
-  const palette = (industryAttributePalette[state.industry] || []).filter((item) => item.f === family).map((item) => item.n);
-  const seen = new Set(palette.map((name) => name.toLowerCase()));
+  // Union the per-family example palette across every selected industry
+  // context, not just the last sector highlighted in the picker. Falls back
+  // to the single `state.industry` for legacy single-industry sessions.
+  const sources = selectedIndustryContexts().map((context) => context.industry);
+  if (!sources.length && state.industry) sources.push(state.industry);
+  const seen = new Set();
+  const palette = [];
+  sources.forEach((id) => {
+    (industryAttributePalette[id] || []).forEach((item) => {
+      if (item.f !== family) return;
+      const key = item.n.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      palette.push(item.n);
+    });
+  });
   const extras = (familyBase[family] || []).filter((name) => !seen.has(name.toLowerCase()));
   return { palette, extras };
 }
@@ -961,7 +975,7 @@ function makeAttributeStep(concept) {
   return {
     id: `attr-${concept.id}`, phase: "Model", nav: concept.short,
     title: () => `What ${concept.name.toLowerCase()} does your ${itemTerm()} carry?`,
-    sub: () => `In ${profile().badge} these are modeled as ${attributeProfile()[concept.dialectKey]}. Pick the ones that matter — pre-populated for ${industry()?.name || "your industry"} and kept representative until customer master data replaces them.`,
+    sub: () => `In ${profile().badge} these are modeled as ${attributeProfile()[concept.dialectKey]}. Pick the ones that matter — pre-populated for ${industryLens() || "your industry"} and kept representative until customer master data replaces them.`,
     hint: "Select the attributes that apply, or mark none, to continue.",
     gate: () => { const slot = attributeSlot(concept.id); return slot.picks.length > 0 || slot.confirmed; },
     body: () => {
@@ -976,7 +990,7 @@ function makeAttributeStep(concept) {
           <span>${escapeHtml(profile().badge)} dialect</span>
         </div>
         ${palette.length ? `
-          <p class="attr-suggested-label">${escapeHtml(industry()?.name || "Industry")} examples</p>
+          <p class="attr-suggested-label">${escapeHtml(industryLens() || "Industry")} examples</p>
           <div class="attr-chips">${palette.map((name) => attributeChip(concept.id, name, slot.picks.includes(name))).join("")}</div>` : ""}
         <p class="attr-suggested-label">Common ${escapeHtml(profile().badge)} fields</p>
         <div class="attr-chips">
