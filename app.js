@@ -108,6 +108,21 @@ const industries = [
   { id: "building-materials", name: "Building Materials", group: "Process industries", icon: "brick-wall", focus: "Kilns, campaigns, bulk logistics, energy-intensive assets", compliance: "Quality certificates · emissions · batch traceability" },
 ];
 
+const industryArchetypeCompatibility = {
+  pharma: ["batch-campaign", "continuous-process", "discrete-assembly", "flow-shop", "packaging-postponement", "maturation-aging"],
+  pesticides: ["batch-campaign", "continuous-process", "flow-shop", "packaging-postponement"],
+  "medical-devices": ["discrete-assembly", "cto-eto", "job-shop", "flow-shop", "packaging-postponement"],
+  "food-beverage": ["batch-campaign", "continuous-process", "flow-shop", "packaging-postponement", "perishable-food", "maturation-aging"],
+  chemicals: ["batch-campaign", "continuous-process", "packaging-postponement", "maturation-aging"],
+  cpg: ["batch-campaign", "continuous-process", "discrete-assembly", "flow-shop", "packaging-postponement", "perishable-food"],
+  automotive: ["discrete-assembly", "cto-eto", "job-shop", "flow-shop"],
+  industrial: ["discrete-assembly", "cto-eto", "job-shop", "flow-shop", "maintenance-turnaround"],
+  electronics: ["discrete-assembly", "cto-eto", "job-shop", "flow-shop", "semiconductor-fab"],
+  aerospace: ["discrete-assembly", "cto-eto", "job-shop", "maintenance-turnaround"],
+  "metals-mining": ["batch-campaign", "continuous-process", "flow-shop", "mining-primary"],
+  "building-materials": ["batch-campaign", "continuous-process", "flow-shop", "maturation-aging"],
+};
+
 const departmentTaxonomy = [
   { id: "production", name: "Production / Processing", icon: "factory", note: "Core conversion, processing, or assembly activities" },
   { id: "packaging", name: "Packaging / Finishing", icon: "package-check", note: "Packing, labeling, finishing, and late-stage differentiation" },
@@ -146,6 +161,7 @@ const initialState = {
   i: 0,
   max: 0,
   scope: null,
+  industryFirst: true,
   archetypes: [],
   industry: null,
   erp: "sap_pi",
@@ -217,6 +233,10 @@ function load() {
         state.departmentTypes = [];
         state.resourceTypes = [];
       }
+      if (!("industryFirst" in saved)) {
+        state.i = 2;
+        state.archetypes = state.archetypes.filter((id) => industryArchetypeCompatibility[state.industry]?.includes(id));
+      }
       delete state.lineDecision;
     }
   } catch { state = clone(initialState); }
@@ -240,6 +260,7 @@ function selectedArchetypes() {
   return (state.archetypes || []).map((id) => planningArchetypes.find((item) => item.id === id)).filter(Boolean);
 }
 function industry() { return industries.find((item) => item.id === state.industry) || null; }
+function isArchetypeCompatible(id) { return !!industryArchetypeCompatibility[state.industry]?.includes(id); }
 function executionSourceLabel() {
   return { erp: `${profile().badge} confirmations`, mes: "MES execution events", hybrid: `Hybrid MES + ${profile().badge}` }[state.execution?.source] || "Not configured";
 }
@@ -359,7 +380,7 @@ const steps = [
   {
     id: "archetype", phase: "Characterize", nav: "Archetype",
     title: "What are you implementing?",
-    sub: "Select every pattern that materially shapes the operation. The model will synthesize a planning backbone without erasing secondary behavior.",
+    sub: () => `Select every operating pattern that materially shapes ${industry()?.name || "the selected industry"}. Incompatible patterns remain visible for context but cannot enter the model.`,
     hint: "Choose at least one archetype to continue.",
     gate: () => state.archetypes?.length > 0,
     body: () => {
@@ -374,7 +395,9 @@ const steps = [
         ${planningArchetypes
           .map(
             (a) => `
-          <button class="pick-card${state.archetypes.includes(a.id) ? " active" : ""}" type="button" data-arch="${a.id}" data-mode="${a.mode}" aria-pressed="${state.archetypes.includes(a.id)}">
+          <button class="pick-card${state.archetypes.includes(a.id) ? " active" : ""}${isArchetypeCompatible(a.id) ? "" : " inactive"}" type="button"
+            ${isArchetypeCompatible(a.id) ? `data-arch="${a.id}"` : "disabled"} data-mode="${a.mode}" aria-pressed="${state.archetypes.includes(a.id)}"
+            title="${isArchetypeCompatible(a.id) ? `Compatible with ${escapeHtml(industry()?.name || "selected industry")}` : `Not supported for ${escapeHtml(industry()?.name || "selected industry")}`}">
             <span class="pick-head"><i data-lucide="${archetypeIcons[a.id]}"></i><span class="pick-mode">${escapeHtml(modeProfiles[a.mode].label)}</span></span>
             <strong>${escapeHtml(a.name)}</strong>
             <p>${escapeHtml(a.core)}</p>
@@ -424,6 +447,8 @@ const steps = [
     attach: (root) => {
       root.querySelectorAll("[data-industry]").forEach((button) => button.addEventListener("click", () => {
         state.industry = button.dataset.industry;
+        state.archetypes = state.archetypes.filter((id) => isArchetypeCompatible(id));
+        state.erp = mode().erp;
         render();
       }));
     },
@@ -889,8 +914,8 @@ const steps = [
       const r = readiness();
       const rows = [
         ["Planning objective", state.scope ? "done" : "open", state.scope === "aps-ds" ? "Advanced Planning & Detailed Scheduling" : "Not selected"],
-        ["Operating archetypes", state.archetypes?.length ? "done" : "open", state.archetypes?.length ? archetypeSynthesis().title : "Not characterized"],
         ["Industry context", state.industry ? "done" : "open", industry()?.name || "Not selected"],
+        ["Operating archetypes", state.archetypes?.length ? "done" : "open", state.archetypes?.length ? archetypeSynthesis().title : "Not characterized"],
         ["Department taxonomy", state.departmentTypes?.length ? "done" : "open", state.departmentTypes?.length ? `${state.departmentTypes.length} semantic types selected` : "Not configured"],
         ["Calendars & capacity", state.calendar?.layering ? "done" : "open", state.calendar?.layering ? `${calendarProfile().base} · ${state.calendar.pattern} · ${state.calendar.exceptions}` : "Not characterized"],
         ["Resource taxonomy", state.resourceTypes?.length ? "done" : "open", state.resourceTypes?.length ? `${state.resourceTypes.length} capacity-object types selected` : "Not configured"],
@@ -957,6 +982,12 @@ const steps = [
 ];
 
 // ── Step UI helpers ──────────────────────────────────────────────────
+// Industry constrains valid operating patterns, so it must precede Archetype.
+const industryStepIndex = steps.findIndex((step) => step.id === "industry");
+const archetypeStepIndex = steps.findIndex((step) => step.id === "archetype");
+const [industryStep] = steps.splice(industryStepIndex, 1);
+steps.splice(archetypeStepIndex, 0, industryStep);
+
 function choiceTile(value, active, icon, title, sub) {
   return `
     <button class="choice${active ? " active" : ""}" type="button" data-choice="${escapeHtml(value)}">

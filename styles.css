@@ -3947,6 +3947,17 @@ body.genesis-open {
   background: var(--teal-soft);
 }
 
+.pick-card.inactive {
+  opacity: 0.38;
+  filter: grayscale(0.65);
+  cursor: not-allowed;
+}
+
+.pick-card.inactive:hover {
+  border-color: var(--line);
+  box-shadow: none;
+}
+
 .pick-card[data-mode="discrete"] { border-left-color: var(--violet); }
 .pick-card[data-mode="process"] { border-left-color: var(--teal); }
 .pick-card[data-mode="project"] { border-left-color: var(--amber); }
