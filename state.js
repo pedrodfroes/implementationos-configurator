@@ -48,7 +48,6 @@ const initialState = {
     quantitiesConfirmed: false,
   },
   variant: null, // null | "active" | "kept" | "reverted" | "skipped"
-  demo: null, // { laneId, score, note }
   done: false,
 };
 

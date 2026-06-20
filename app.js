@@ -161,7 +161,6 @@ function exportBrief() {
       ...state.execution,
     },
     decisions: { variant: state.variant, migration: state.migration },
-    demo: state.demo,
     readiness: `${readiness()}%`,
     governedDecisions: Model.nodesOfType("decision").map((d) => d.props),
   };

@@ -110,7 +110,6 @@ function readiness() {
   if (state.bom?.structure && state.bom?.featuresConfirmed && state.bom?.consumption && state.bom?.source) s += 8;
   if (state.execution?.source && state.execution?.levels?.length && state.execution?.events?.length && state.execution?.quantitiesConfirmed) s += 8;
   if (state.variant && state.variant !== "active") s += 6;
-  if (state.demo) s += Math.round(state.demo.score * 0.24);
   if (state.migration) s -= 4;
   return Math.max(5, Math.min(99, Math.round(s)));
 }

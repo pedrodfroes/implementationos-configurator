@@ -628,39 +628,6 @@ const steps = [
     },
   },
   {
-    id: "demo", phase: "Validate", nav: "Representative scenario",
-    title: "Validate with a synthetic scheduling scenario.",
-    sub: () => `A generated rush ${profile().order.toLowerCase()} needs representative packaging capacity. The scenario tests the configured logic without asking for customer orders or resources.`,
-    hint: "Schedule the order to continue.",
-    gate: () => !!state.demo,
-    body: () => {
-      const lanes = [
-        ["wc-pack-3", "Packaging Line 3", "Preferred line, but calendar data is incomplete."],
-        ["wc-pack-2", "Packaging Line 2", "Alternate line with available capacity."],
-        ["wc-qc-1", "QC Release Bench", "Wrong capability for packaging operations."],
-      ];
-      return `
-        ${state.demo ? `<div class="demo-result"><strong>${state.demo.score}% — training scored</strong><p>${escapeHtml(state.demo.note)}</p></div>` : ""}
-        <div class="lane-list">
-          ${lanes
-            .map(
-              ([id, name, note]) => `
-            <button class="lane${state.demo?.laneId === id ? " picked" : ""}" type="button" data-lane="${id}">
-              <strong>${escapeHtml(name)}</strong>
-              <span>${escapeHtml(note)}</span>
-            </button>`
-            )
-            .join("")}
-        </div>
-      `;
-    },
-    attach: (root) => {
-      root.querySelectorAll("[data-lane]").forEach((b) =>
-        b.addEventListener("click", () => { scoreDemo(b.dataset.lane); })
-      );
-    },
-  },
-  {
     id: "readiness", phase: "Validate", nav: "Readiness",
     title: "Your readiness so far.",
     sub: "Computed from every decision you've made — model completeness, the data issue, and the demo evidence.",
@@ -679,7 +646,6 @@ const steps = [
         ["Setup & changeovers", transitionsConfigured() ? "done" : "open", state.transitions?.types?.length ? `${transitionTypes.filter((x) => state.transitions.types.includes(x.id)).map((x) => x.name).join(", ")} · ${state.transitions.triggers.length} trigger${state.transitions.triggers.length === 1 ? "" : "s"}` : "Not characterized"],
         ["BOM profile", state.bom?.source ? "done" : "open", state.bom?.source ? `${state.bom.structure} · ${state.bom.consumption} · ${state.bom.source}` : "Not characterized"],
         ["Execution feedback", state.execution?.source ? "done" : "open", state.execution?.source ? `${executionSourceLabel()} · ${state.execution.events.join(", ")}` : "Not configured"],
-        ["Representative evidence", state.demo ? "done" : "open", state.demo ? `${state.demo.score}% scenario score` : "Pending"],
         ["Migration risk", "info", state.migration ? "S/4 migration on roadmap" : "No migration planned"],
       ];
       return `
@@ -722,7 +688,6 @@ const steps = [
           <div class="summary-card"><span>Capacity</span><strong>${state.calendar?.layering ? escapeHtml(state.calendar.layering) : "Pending"}</strong><small>${state.calendar?.pattern ? escapeHtml(state.calendar.pattern) : "calendar pattern not set"}</small></div>
           <div class="summary-card"><span>Execution</span><strong>${escapeHtml(executionSourceLabel())}</strong><small>${state.execution?.events?.length ? escapeHtml(state.execution.events.join(" · ")) : "feedback events not set"}</small></div>
           <div class="summary-card"><span>Decisions</span><strong>${decisions.length} governed</strong><small>${decisions.length ? "merge history travels with handoff" : "no branch merges"}</small></div>
-          <div class="summary-card"><span>Evidence</span><strong>${state.demo ? state.demo.score + "% training" : "Pending"}</strong><small>${state.demo ? "seeds the support runbook" : "no scored scenario"}</small></div>
           <div class="summary-card"><span>Readiness</span><strong>${readiness()}%</strong><small>at handoff</small></div>
         </div>
         <section class="generated-preview" aria-label="Generated representative dataset">
@@ -820,13 +785,4 @@ function makeAttributeStep(concept) {
       });
     },
   };
-}
-
-function scoreDemo(laneId) {
-  let r;
-  if (laneId === "wc-pack-2") r = { score: 92, note: "Packaging Line 2 is a valid alternate, and the model keeps the Line 3 calendar issue open for data cleanup." };
-  else if (laneId === "wc-pack-3") r = { score: 54, note: "Line 3 still has an unresolved calendar issue — it shouldn't run the rush order." };
-  else r = { score: 28, note: "That resource doesn't perform packaging operations. The miss links to training and role readiness." };
-  state.demo = { laneId, ...r };
-  render();
 }
