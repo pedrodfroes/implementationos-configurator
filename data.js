@@ -79,19 +79,55 @@ const archetypeIcons = {
 };
 
 const industries = [
-  { id: "pharma", name: "Pharmaceutical / Biopharma", group: "Life sciences", icon: "pill", focus: "GMP batches, potency, genealogy, cleaning, QA release", compliance: "GxP · electronic records · validated processes" },
-  { id: "pesticides", name: "Crop Protection / Pesticides", group: "Agrochemicals", icon: "sprout", focus: "Active ingredients, campaign cleaning, hazardous segregation, pack labels", compliance: "Product registrations · HSE · environmental controls" },
-  { id: "medical-devices", name: "Medical Devices", group: "Life sciences", icon: "stethoscope", focus: "Device history, UDI, controlled assembly, sterilization", compliance: "QMS · traceability · regulated change control" },
   { id: "food-beverage", name: "Food & Beverage", group: "Consumer process", icon: "utensils", focus: "Shelf life, allergens, recipes, yield, sanitation", compliance: "Food safety · lot traceability · labeling" },
-  { id: "chemicals", name: "Chemicals", group: "Process industries", icon: "flask-conical", focus: "Formulas, tanks, campaigns, co-products, hazardous materials", compliance: "SDS · process safety · environmental controls" },
-  { id: "cpg", name: "Consumer Packaged Goods", group: "Consumer products", icon: "package", focus: "High-SKU packaging, postponement, promotions, changeovers", compliance: "Label control · market variants · traceability" },
-  { id: "automotive", name: "Automotive", group: "Discrete manufacturing", icon: "car", focus: "Sequenced supply, variants, line balance, supplier constraints", compliance: "PPAP · serial genealogy · quality gates" },
-  { id: "industrial", name: "Industrial Equipment", group: "Discrete manufacturing", icon: "cog", focus: "BOM depth, engineer-to-order, skills, tools, long lead parts", compliance: "Configuration control · inspection evidence" },
-  { id: "electronics", name: "Electronics / Semiconductor", group: "High-tech", icon: "microchip", focus: "Reentrant flows, yield, alternates, cleanroom tools", compliance: "Material genealogy · process control · export rules" },
-  { id: "aerospace", name: "Aerospace & Defense", group: "Regulated discrete", icon: "plane", focus: "Effectivity, serialized parts, scarce skills, project networks", compliance: "Airworthiness · full traceability · controlled data" },
-  { id: "metals-mining", name: "Metals / Mining", group: "Primary industries", icon: "mountain", focus: "Blending, grades, campaign assets, energy, extraction", compliance: "Assay · chain of custody · environmental constraints" },
+  { id: "pharma", name: "Pharmaceuticals & Biotech", group: "Life sciences", icon: "pill", focus: "GMP batches, potency, genealogy, cleaning, QA release", compliance: "GxP · electronic records · validated processes" },
+  { id: "medical-devices", name: "Medical Devices", group: "Life sciences", icon: "stethoscope", focus: "Device history, UDI, controlled assembly, sterilization", compliance: "QMS · traceability · regulated change control" },
+  { id: "chemicals", name: "Chemicals, Plastics & Polymers", group: "Process industries", icon: "flask-conical", focus: "Formulas, tanks, campaigns, co-products, hazardous materials", compliance: "SDS · process safety · environmental controls" },
+  { id: "metals-mining", name: "Metals & Heavy Industry", group: "Primary industries", icon: "mountain", focus: "Blending, grades, campaign assets, energy, extraction", compliance: "Assay · chain of custody · environmental constraints" },
   { id: "building-materials", name: "Building Materials", group: "Process industries", icon: "brick-wall", focus: "Kilns, campaigns, bulk logistics, energy-intensive assets", compliance: "Quality certificates · emissions · batch traceability" },
+  { id: "automotive", name: "Automotive & Mobility", group: "Discrete manufacturing", icon: "car", focus: "Sequenced supply, variants, line balance, supplier constraints", compliance: "PPAP · serial genealogy · quality gates" },
+  { id: "aerospace", name: "Aerospace & Defense", group: "Regulated discrete", icon: "plane", focus: "Effectivity, serialized parts, scarce skills, project networks", compliance: "Airworthiness · full traceability · controlled data" },
+  { id: "electronics", name: "Electronics & High-Tech", group: "High-tech", icon: "microchip", focus: "Reentrant flows, yield, alternates, cleanroom tools", compliance: "Material genealogy · process control · export rules" },
+  { id: "packaging", name: "Packaging", group: "Conversion & packing", icon: "package", focus: "High-SKU conversion, printing, filling, packing, and changeovers", compliance: "Label control · market variants · traceability" },
+  { id: "consumer-goods", name: "Paper, Textile & Consumer Goods", group: "Consumer products", icon: "shirt", focus: "Materials, variants, seasonal demand, finishing, and packing", compliance: "Product safety · labeling · source traceability" },
+  { id: "industrial", name: "Industrial Equipment", group: "Discrete manufacturing", icon: "cog", focus: "BOM depth, engineer-to-order, skills, tools, long lead parts", compliance: "Configuration control · inspection evidence" },
+  { id: "energy-services", name: "Energy, Utilities & Industrial Services", group: "Asset intensive", icon: "zap", focus: "Continuous assets, maintenance windows, utilities, and field constraints", compliance: "Process safety · asset integrity · environmental controls" },
+  { id: "operations-services", name: "MRO & Resource-Constrained Services", group: "Beyond manufacturing", icon: "wrench", focus: "Finite skills, bays, tools, sequence constraints, and due dates", compliance: "Work evidence · safety · service traceability" },
 ];
+
+const industrySpecialties = {
+  "food-beverage": ["General food & beverage", "Spirits / distilleries", "Breweries", "Wine", "Juice", "Soft drinks", "Bottled water", "Dairy", "Cheese", "Yogurt", "Ice cream", "Meat processing", "Poultry", "Seafood", "Bakery", "Biscuits / cookies", "Chocolate", "Confectionery", "Sugar refining", "Coffee roasting", "Tea blending", "Frozen foods", "Ready meals", "Sauces / condiments", "Canned foods", "Snacks / chips", "Cereals", "Infant nutrition", "Pet food", "Nutraceutical foods"],
+  pharma: ["General pharmaceuticals & biotech", "Injectables", "Sterile fill-finish", "Vaccines", "Biologics", "Cell and gene therapy", "API", "OSD tablets", "Capsules", "Softgels", "Creams / ointments", "Liquids / syrups", "Inhalers", "Medical cannabis", "Contract manufacturing (CDMO / CMO)", "Packaging and serialization", "Laboratory reagent production", "Blood products / plasma fractionation"],
+  "medical-devices": ["General medical devices", "Sterile disposable devices", "Diagnostic devices", "Implants", "Surgical instruments", "Combination products", "Medical electronics", "Contract device manufacturing"],
+  chemicals: ["Specialty chemicals", "Commodity chemicals", "Paints and coatings", "Adhesives", "Resins", "Solvents", "Fertilizers", "Agrochemicals / pesticides", "Industrial gases", "Lubricants", "Detergents", "Cosmetics", "Fragrances", "Personal care", "Cleaning products", "Battery chemicals", "Pulp chemicals", "Water treatment chemicals", "Plastic extrusion", "Plastic injection molding", "Plastic rotomolding", "Blow molding", "Thermoforming", "Film extrusion", "Pipe extrusion", "Rubber molding", "Tires", "Hoses", "Seals and gaskets", "Foam products", "Composite materials", "Packaging plastics", "Recycled plastics processing"],
+  "metals-mining": ["Steelworks", "Mini-mills", "Foundries", "Forging", "Rolling mills", "Aluminum smelting", "Aluminum extrusion", "Copper processing", "Wire and cable", "Metal stamping", "Machining", "Heat treatment", "Surface treatment", "Galvanizing", "Powder metallurgy", "Toolmaking", "Industrial castings", "Mining / primary extraction"],
+  "building-materials": ["Cement", "Concrete", "Precast concrete", "Aggregates", "Asphalt", "Bricks", "Ceramics", "Tiles", "Glass", "Insulation materials", "Drywall / gypsum board", "Roofing materials", "Pipes and fittings", "Wood panels", "Flooring"],
+  automotive: ["Automotive assembly", "Powertrain", "EV batteries", "Battery packs", "Tires", "Seats", "Wiring harnesses", "Stamping", "Paint shops", "Injection-molded components", "Glass components", "Brakes", "Suspension", "Electronics modules", "Aftermarket parts", "Rail components", "Shipbuilding", "Heavy vehicles", "Agricultural machinery"],
+  aerospace: ["Aerospace components", "Aircraft assembly", "Engines and propulsion", "Avionics", "Space systems", "Defense manufacturing"],
+  electronics: ["Semiconductors", "PCB assembly", "Consumer electronics", "Industrial electronics", "Telecom equipment", "Sensors", "Batteries", "Solar panels", "LED manufacturing", "Data center hardware", "Medical electronics", "Appliances", "Cable assemblies"],
+  packaging: ["Bottling", "Canning", "Cartoning", "Labels", "Flexible packaging", "Corrugated packaging", "Glass bottles", "Aluminum cans", "Plastic bottles", "Closures / caps", "Blister packaging", "Pharmaceutical packaging", "Food packaging", "Palletizing operations"],
+  "consumer-goods": ["Paper mills", "Tissue products", "Printing", "Publishing / commercial print", "Textile weaving", "Textile dyeing", "Apparel manufacturing", "Footwear", "Furniture", "Mattresses", "Household goods", "Toys", "Sporting goods", "Luxury goods", "Jewelry manufacturing", "Eyewear"],
+  industrial: ["General industrial equipment", "Power equipment manufacturing", "Wind turbine components", "Solar equipment manufacturing", "Nuclear component manufacturing", "Large capital equipment assembly", "Engineering workshops", "Tool rooms"],
+  "energy-services": ["Oil refining", "Petrochemicals", "LNG operations", "Biofuels", "Hydrogen production", "Waste processing", "Recycling plants", "Water treatment operations", "Industrial maintenance shutdowns"],
+  "operations-services": ["MRO / maintenance repair overhaul", "Aircraft maintenance", "Rail maintenance", "Fleet workshops", "Ship repair", "Industrial maintenance", "Construction prefabrication", "Hospital operating rooms", "Lab scheduling", "Warehouse value-added services", "Distribution center labor planning"],
+};
+
+const industryArchetypeCompatibility = {
+  pharma: ["batch-campaign", "continuous-process", "discrete-assembly", "flow-shop", "packaging-postponement", "maturation-aging"],
+  "medical-devices": ["discrete-assembly", "cto-eto", "job-shop", "flow-shop", "packaging-postponement"],
+  "food-beverage": ["batch-campaign", "continuous-process", "flow-shop", "packaging-postponement", "perishable-food", "maturation-aging"],
+  chemicals: ["batch-campaign", "continuous-process", "discrete-assembly", "flow-shop", "packaging-postponement", "maturation-aging"],
+  packaging: ["batch-campaign", "continuous-process", "discrete-assembly", "flow-shop", "packaging-postponement"],
+  "consumer-goods": ["batch-campaign", "continuous-process", "discrete-assembly", "job-shop", "flow-shop", "packaging-postponement", "perishable-food"],
+  automotive: ["discrete-assembly", "cto-eto", "job-shop", "flow-shop"],
+  industrial: ["discrete-assembly", "cto-eto", "job-shop", "flow-shop", "maintenance-turnaround"],
+  electronics: ["discrete-assembly", "cto-eto", "job-shop", "flow-shop", "semiconductor-fab"],
+  aerospace: ["discrete-assembly", "cto-eto", "job-shop", "maintenance-turnaround"],
+  "metals-mining": ["batch-campaign", "continuous-process", "discrete-assembly", "job-shop", "flow-shop", "mining-primary"],
+  "building-materials": ["batch-campaign", "continuous-process", "flow-shop", "maturation-aging"],
+  "energy-services": ["batch-campaign", "continuous-process", "flow-shop", "maintenance-turnaround"],
+  "operations-services": ["cto-eto", "job-shop", "maintenance-turnaround", "construction-project", "healthcare-capacity", "field-service"],
+};
 
 const departmentTaxonomy = [
   { id: "production", name: "Production / Processing", icon: "factory", note: "Core conversion, processing, or assembly activities" },

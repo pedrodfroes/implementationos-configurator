@@ -21,6 +21,21 @@ function selectedArchetypes() {
   return (state.archetypes || []).map((id) => planningArchetypes.find((item) => item.id === id)).filter(Boolean);
 }
 function industry() { return industries.find((item) => item.id === state.industry) || null; }
+function selectedIndustryContexts() {
+  return (state.industryContexts || []).map((context) => ({ ...context, sector: industries.find((item) => item.id === context.industry) })).filter((context) => context.sector);
+}
+function industryLabel() {
+  const contexts = selectedIndustryContexts();
+  if (contexts.length === 1) return contexts[0].specialty;
+  return contexts.length ? `${contexts.length} industry contexts` : null;
+}
+function industryLens() {
+  return [...new Set(selectedIndustryContexts().map((context) => context.sector.name))].join(" + ");
+}
+function compatibleContextLabels(id) {
+  return selectedIndustryContexts().filter((context) => industryArchetypeCompatibility[context.industry]?.includes(id)).map((context) => context.specialty);
+}
+function isArchetypeCompatible(id) { return compatibleContextLabels(id).length > 0; }
 function executionSourceLabel() {
   return { erp: `${profile().badge} confirmations`, mes: "MES execution events", hybrid: `Hybrid MES + ${profile().badge}` }[state.execution?.source] || "Not configured";
 }
@@ -99,7 +114,7 @@ function readiness() {
   let s = 16;
   if (state.scope) s += 12;
   if (state.archetypes?.length) s += 8;
-  if (state.industry) s += 6;
+  if (selectedIndustryContexts().length) s += 6;
   if (state.departmentTypes?.length) s += 8;
   if (state.calendar?.layering && state.calendar?.pattern && state.calendar?.exceptions && state.calendar?.modifiersConfirmed) s += 8;
   if (state.constraint) s += 6;

@@ -10,8 +10,11 @@ const initialState = {
   i: 0,
   max: 0,
   scope: null,
+  industryFirst: true,
   archetypes: [],
   industry: null,
+  industrySpecialty: null,
+  industryContexts: [],
   erp: "sap_pi",
   migration: null,
   calendar: {
@@ -63,6 +66,9 @@ function load() {
     if (raw) {
       const saved = JSON.parse(raw);
       state = { ...clone(initialState), ...saved };
+      if (!Array.isArray(saved.industryContexts) && saved.industry && saved.industrySpecialty) {
+        state.industryContexts = [{ industry: saved.industry, specialty: saved.industrySpecialty }];
+      }
       if (!Array.isArray(saved.archetypes) && saved.archetype) state.archetypes = [saved.archetype];
       if (!("scope" in saved)) {
         state.i = 1;
@@ -87,6 +93,10 @@ function load() {
         if (Number(saved.max || 0) >= 9) state.i = 8;
         state.departmentTypes = [];
         state.resourceTypes = [];
+      }
+      if (!("industryFirst" in saved)) {
+        state.i = 2;
+        state.archetypes = state.archetypes.filter((id) => industryArchetypeCompatibility[state.industry]?.includes(id));
       }
       delete state.lineDecision;
     }

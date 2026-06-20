@@ -55,7 +55,7 @@ const steps = [
   {
     id: "archetype", phase: "Characterize", nav: "Archetype",
     title: "What are you implementing?",
-    sub: "Select every pattern that materially shapes the operation. The model will synthesize a planning backbone without erasing secondary behavior.",
+    sub: () => `Select every operating pattern that materially shapes ${industryLabel() || "the selected industry"}. Incompatible patterns remain visible for context but cannot enter the model.`,
     hint: "Choose at least one archetype to continue.",
     gate: () => state.archetypes?.length > 0,
     body: () => {
@@ -70,7 +70,9 @@ const steps = [
         ${planningArchetypes
           .map(
             (a) => `
-          <button class="pick-card${state.archetypes.includes(a.id) ? " active" : ""}" type="button" data-arch="${a.id}" data-mode="${a.mode}" aria-pressed="${state.archetypes.includes(a.id)}">
+          <button class="pick-card${state.archetypes.includes(a.id) ? " active" : ""}${isArchetypeCompatible(a.id) ? "" : " inactive"}" type="button"
+            ${isArchetypeCompatible(a.id) ? `data-arch="${a.id}"` : "disabled"} data-mode="${a.mode}" aria-pressed="${state.archetypes.includes(a.id)}"
+            title="${isArchetypeCompatible(a.id) ? `Supported by ${escapeHtml(compatibleContextLabels(a.id).join(", "))}` : `Not supported by the selected industry contexts`}">
             <span class="pick-head"><i data-lucide="${archetypeIcons[a.id]}"></i><span class="pick-mode">${escapeHtml(modeProfiles[a.mode].label)}</span></span>
             <strong>${escapeHtml(a.name)}</strong>
             <p>${escapeHtml(a.core)}</p>
@@ -94,26 +96,45 @@ const steps = [
   },
   {
     id: "industry", phase: "Characterize", nav: "Industry context",
-    title: "Which industry context shapes the implementation?",
-    sub: "Industry does not replace the operating archetype. It adds the regulatory, quality, traceability, safety, and terminology lens that makes the same production pattern behave differently.",
-    hint: "Choose the primary industry context to continue.",
-    gate: () => !!state.industry,
+    title: "Which industry contexts does this implementation cover?",
+    sub: "Build the implementation's coverage across products, sites, and business units. Add every relevant specialization; the next step reconciles their operating archetypes.",
+    hint: "Add at least one industry context to continue.",
+    gate: () => selectedIndustryContexts().length > 0,
     body: () => {
       const selected = industry();
+      const specialties = selected ? industrySpecialties[selected.id] || [] : [];
+      const contexts = selectedIndustryContexts();
       return `
-        ${selected ? `
-          <div class="industry-synthesis">
-            <i data-lucide="${selected.icon}"></i>
-            <div><strong>${escapeHtml(selected.name)}</strong><p>${escapeHtml(selected.focus)}</p></div>
-            <span>${escapeHtml(selected.compliance)}</span>
-          </div>` : ""}
-        <div class="industry-grid">
-          ${industries.map((item) => `
-            <button class="industry-card${state.industry === item.id ? " active" : ""}" type="button" data-industry="${item.id}" aria-pressed="${state.industry === item.id}">
-              <i data-lucide="${item.icon}"></i>
-              <span><small>${escapeHtml(item.group)}</small><strong>${escapeHtml(item.name)}</strong><em>${escapeHtml(item.focus)}</em></span>
-            </button>
-          `).join("")}
+        <div class="context-tray${contexts.length ? " has-contexts" : ""}">
+          <div class="context-tray-title"><span>Project coverage</span><strong>${contexts.length ? `${contexts.length} selected` : "No contexts yet"}</strong></div>
+          <div class="context-chips">
+            ${contexts.length ? contexts.map((context, index) => `<button class="context-chip" type="button" data-remove-context="${index}" title="Remove ${escapeHtml(context.specialty)}"><i data-lucide="${context.sector.icon}"></i><span><small>${escapeHtml(context.sector.name)}</small>${escapeHtml(context.specialty)}</span><i data-lucide="x"></i></button>`).join("") : `<span class="context-empty">Choose one or several specializations below. Cross-sector combinations are supported.</span>`}
+          </div>
+        </div>
+        <div class="industry-picker">
+          <div class="sector-list" aria-label="Industry sectors">
+            <span class="picker-label">1 · Sector</span>
+            ${industries.map((item) => {
+              const count = contexts.filter((context) => context.industry === item.id).length;
+              return `
+              <button class="sector-option${state.industry === item.id ? " active" : ""}" type="button" data-industry="${item.id}" aria-pressed="${state.industry === item.id}">
+                <i data-lucide="${item.icon}"></i><span>${escapeHtml(item.name)}</span>${count ? `<b>${count}</b>` : `<i data-lucide="chevron-right"></i>`}
+              </button>`;
+            }).join("")}
+          </div>
+          <div class="specialty-panel">
+            <div class="specialty-head">
+              <div><span class="picker-label">2 · Specialization</span><strong>${selected ? escapeHtml(selected.name) : "Select a sector"}</strong></div>
+              ${selected ? `<label class="specialty-search"><i data-lucide="search"></i><input id="specialtySearch" type="search" placeholder="Search ${escapeHtml(selected.name)}" autocomplete="off" aria-label="Search specializations"></label>` : ""}
+            </div>
+            ${selected ? `<div class="specialty-list" id="specialtyList">
+              ${specialties.map((item, index) => {
+                const active = contexts.some((context) => context.industry === state.industry && context.specialty === item);
+                return `<button class="specialty-option${active ? " active" : ""}" type="button" data-specialty-index="${index}" aria-pressed="${active}"><span>${escapeHtml(item)}</span><i data-lucide="check"></i></button>`;
+              }).join("")}
+              <p class="specialty-empty" id="specialtyEmpty" hidden>No matching specialization.</p>
+            </div>` : `<div class="specialty-placeholder"><i data-lucide="corner-down-left"></i><p>Pick the closest sector to reveal its focused industry list.</p></div>`}
+          </div>
         </div>
       `;
     },
@@ -122,6 +143,35 @@ const steps = [
         state.industry = button.dataset.industry;
         render();
       }));
+      root.querySelectorAll("[data-specialty-index]").forEach((button) => button.addEventListener("click", () => {
+        const specialty = (industrySpecialties[state.industry] || [])[Number(button.dataset.specialtyIndex)];
+        const contexts = [...(state.industryContexts || [])];
+        const existing = contexts.findIndex((context) => context.industry === state.industry && context.specialty === specialty);
+        existing >= 0 ? contexts.splice(existing, 1) : contexts.push({ industry: state.industry, specialty });
+        state.industryContexts = contexts;
+        state.industrySpecialty = contexts.at(-1)?.specialty || null;
+        state.archetypes = state.archetypes.filter((id) => isArchetypeCompatible(id));
+        state.erp = mode().erp;
+        render();
+      }));
+      root.querySelectorAll("[data-remove-context]").forEach((button) => button.addEventListener("click", () => {
+        state.industryContexts.splice(Number(button.dataset.removeContext), 1);
+        state.industrySpecialty = state.industryContexts.at(-1)?.specialty || null;
+        state.archetypes = state.archetypes.filter((id) => isArchetypeCompatible(id));
+        state.erp = mode().erp;
+        render();
+      }));
+      root.querySelector("#specialtySearch")?.addEventListener("input", (event) => {
+        const query = event.target.value.trim().toLocaleLowerCase();
+        let visible = 0;
+        root.querySelectorAll("[data-specialty-index]").forEach((button) => {
+          const matches = button.textContent.toLocaleLowerCase().includes(query);
+          button.hidden = !matches;
+          if (matches) visible += 1;
+        });
+        const empty = root.querySelector("#specialtyEmpty");
+        if (empty) empty.hidden = visible > 0;
+      });
     },
   },
   {
@@ -131,7 +181,7 @@ const steps = [
     body: () => `
       <div class="derive">
         <div class="derive-chain">
-          <span class="chain-node industry-node">${escapeHtml(industry()?.name || "Industry not set")}</span>
+          <span class="chain-node industry-node">${escapeHtml(industryLabel() || "Industry not set")}</span>
           <i data-lucide="plus"></i>
           <span class="chain-node">${escapeHtml(archetypeSynthesis().count === 1 ? archetypeSynthesis().title : `${archetypeSynthesis().count} reconciled patterns`)}</span>
           <i data-lucide="arrow-right"></i>
@@ -139,7 +189,7 @@ const steps = [
           <i data-lucide="arrow-right"></i>
           <span class="chain-node">${escapeHtml(profile().badge)}</span>
         </div>
-        <p class="derive-note">${escapeHtml(mode().note)} ${industry() ? `Industry lens: ${escapeHtml(industry().focus)}` : ""}</p>
+        <p class="derive-note">${escapeHtml(mode().note)} ${selectedIndustryContexts().length ? `Portfolio lens: ${escapeHtml(industryLens())}` : ""}</p>
         <label class="field big-field">
           <span>ERP dialect</span>
           <select id="erpSelect">
@@ -637,8 +687,8 @@ const steps = [
       const attrPicksTotal = Object.values(state.attr || {}).reduce((sum, slot) => sum + (slot?.picks?.length || 0), 0);
       const rows = [
         ["Planning objective", state.scope ? "done" : "open", state.scope === "aps-ds" ? "Advanced Planning & Detailed Scheduling" : "Not selected"],
+        ["Industry contexts", selectedIndustryContexts().length ? "done" : "open", selectedIndustryContexts().length ? selectedIndustryContexts().map((context) => context.specialty).join(" · ") : "Not selected"],
         ["Operating archetypes", state.archetypes?.length ? "done" : "open", state.archetypes?.length ? archetypeSynthesis().title : "Not characterized"],
-        ["Industry context", state.industry ? "done" : "open", industry()?.name || "Not selected"],
         ["Department taxonomy", state.departmentTypes?.length ? "done" : "open", state.departmentTypes?.length ? `${state.departmentTypes.length} semantic types selected` : "Not configured"],
         ["Calendars & capacity", state.calendar?.layering ? "done" : "open", state.calendar?.layering ? `${calendarProfile().base} · ${state.calendar.pattern} · ${state.calendar.exceptions}` : "Not characterized"],
         ["Resource taxonomy", state.resourceTypes?.length ? "done" : "open", state.resourceTypes?.length ? `${state.resourceTypes.length} capacity-object types selected` : "Not configured"],
@@ -680,7 +730,7 @@ const steps = [
       return `
         <div class="summary-grid">
           <div class="summary-card"><span>Objective</span><strong>${state.scope === "aps-ds" ? "APS / Detailed Scheduling" : "Pending"}</strong><small>hours-to-weeks planning horizon</small></div>
-          <div class="summary-card"><span>Industry</span><strong>${industry() ? escapeHtml(industry().name) : "Pending"}</strong><small>${industry() ? escapeHtml(industry().compliance) : "context not selected"}</small></div>
+          <div class="summary-card"><span>Industry coverage</span><strong>${industryLabel() ? escapeHtml(industryLabel()) : "Pending"}</strong><small>${selectedIndustryContexts().length ? escapeHtml(selectedIndustryContexts().map((context) => context.specialty).join(" · ")) : "context not selected"}</small></div>
           <div class="summary-card"><span>Representative data</span><strong>${generated.departments.length} departments · ${generated.resources.length} resources</strong><small>synthetic and replaceable</small></div>
           <div class="summary-card"><span>Item attributes</span><strong>${attrPicksTotal} captured</strong><small>${escapeHtml(attributeProfile().family)}</small></div>
           <div class="summary-card"><span>Setup & cleaning</span><strong>${state.transitions?.types?.length ? `${state.transitions.types.length} transition type${state.transitions.types.length === 1 ? "" : "s"}` : "Pending"}</strong><small>${state.transitions?.concurrency ? escapeHtml(transitionConcurrency.find((x) => x.id === state.transitions.concurrency)?.name || "") : "concurrency not set"}</small></div>
@@ -706,6 +756,12 @@ const steps = [
     },
   },
 ];
+
+// Industry constrains valid operating patterns, so it must precede Archetype.
+const industryStepIndex = steps.findIndex((step) => step.id === "industry");
+const archetypeStepIndex = steps.findIndex((step) => step.id === "archetype");
+const [industryStep] = steps.splice(industryStepIndex, 1);
+steps.splice(archetypeStepIndex, 0, industryStep);
 
 // ── Step UI helpers ──────────────────────────────────────────────────
 function choiceTile(value, active, icon, title, sub) {

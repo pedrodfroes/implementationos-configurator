@@ -113,7 +113,8 @@ function exportBrief() {
   const brief = {
     product: "ImplementationOS for Manufacturing Software",
     planningObjective: planningLevels.find((item) => item.id === state.scope) || null,
-    industry: industry(),
+    industry: selectedIndustryContexts()[0] ? { ...selectedIndustryContexts()[0].sector, specialty: selectedIndustryContexts()[0].specialty } : null,
+    industries: selectedIndustryContexts().map(({ industry: industryId, specialty, sector }) => ({ ...sector, id: industryId, specialty })),
     archetypes: selectedArchetypes().map(({ id, name, mode: archetypeMode }) => ({ id, name, mode: archetypeMode })),
     archetypeSynthesis: { ...archetypeSynthesis(), ...modeMix(), dominantLabel: mode().label },
     mode: mode().label,
