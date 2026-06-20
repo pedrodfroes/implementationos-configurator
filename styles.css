@@ -3718,7 +3718,7 @@ body.genesis-open {
   padding: 8px 40px;
   max-width: 940px;
   width: 100%;
-  margin: 0 auto;
+  margin: 0;
 }
 
 .step-phase {
@@ -3752,7 +3752,7 @@ body.genesis-open {
   padding: 18px 40px 28px;
   max-width: 940px;
   width: 100%;
-  margin: 0 auto;
+  margin: 0;
 }
 
 .foot-right {
