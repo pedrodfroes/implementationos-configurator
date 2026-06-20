@@ -106,7 +106,7 @@ const industrySpecialties = {
   aerospace: ["Aerospace components", "Aircraft assembly", "Engines and propulsion", "Avionics", "Space systems", "Defense manufacturing"],
   electronics: ["Semiconductors", "PCB assembly", "Consumer electronics", "Industrial electronics", "Telecom equipment", "Sensors", "Batteries", "Solar panels", "LED manufacturing", "Data center hardware", "Medical electronics", "Appliances", "Cable assemblies"],
   packaging: ["Bottling", "Canning", "Cartoning", "Labels", "Flexible packaging", "Corrugated packaging", "Glass bottles", "Aluminum cans", "Plastic bottles", "Closures / caps", "Blister packaging", "Pharmaceutical packaging", "Food packaging", "Palletizing operations"],
-  "consumer-goods": ["Paper mills", "Tissue products", "Printing", "Publishing / commercial print", "Textile weaving", "Textile dyeing", "Apparel manufacturing", "Footwear", "Furniture", "Mattresses", "Household goods", "Toys", "Sporting goods", "Luxury goods", "Jewelry manufacturing", "Eyewear"],
+  "consumer-goods": ["Paper mills", "Tissue products", "Printing", "Publishing / commercial print", "Textile weaving", "Textile dyeing", "Apparel manufacturing", "Footwear", "Furniture", "Mattresses", "Stationery / writing instruments", "Household goods", "Toys", "Sporting goods", "Luxury goods", "Jewelry manufacturing", "Eyewear"],
   industrial: ["General industrial equipment", "Power equipment manufacturing", "Wind turbine components", "Solar equipment manufacturing", "Nuclear component manufacturing", "Large capital equipment assembly", "Engineering workshops", "Tool rooms"],
   "energy-services": ["Oil refining", "Petrochemicals", "LNG operations", "Biofuels", "Hydrogen production", "Waste processing", "Recycling plants", "Water treatment operations", "Industrial maintenance shutdowns"],
   "operations-services": ["MRO / maintenance repair overhaul", "Aircraft maintenance", "Rail maintenance", "Fleet workshops", "Ship repair", "Industrial maintenance", "Construction prefabrication", "Hospital operating rooms", "Lab scheduling", "Warehouse value-added services", "Distribution center labor planning"],
@@ -127,6 +127,34 @@ const industryArchetypeCompatibility = {
   "building-materials": ["batch-campaign", "continuous-process", "flow-shop", "maturation-aging"],
   "energy-services": ["batch-campaign", "continuous-process", "flow-shop", "maintenance-turnaround"],
   "operations-services": ["cto-eto", "job-shop", "maintenance-turnaround", "construction-project", "healthcare-capacity", "field-service"],
+};
+
+const supplyProfileCatalog = {
+  "natural-feedstock": { name: "Natural / source-bound feedstock", icon: "trees", note: "Wood, fibers, agricultural inputs, minerals, or other supply that cannot be created through expediting.", drivers: ["Long lead time", "Source capacity", "Variable quality"], recommended: "hard" },
+  "qualified-material": { name: "Qualified active or regulated material", icon: "badge-check", note: "Approved sources, specifications, release status, and substitution rules limit availability.", drivers: ["Qualified source", "QA release", "No easy substitute"], recommended: "hard" },
+  "cold-chain": { name: "Shelf-life / cold-chain material", icon: "snowflake", note: "Expiry, remaining shelf life, temperature state, and storage slots determine usable supply.", drivers: ["Shelf life", "Cold storage", "Lot eligibility"], recommended: "hard" },
+  "long-lead-component": { name: "Allocated or long-lead component", icon: "cpu", note: "Semiconductors, bespoke parts, tooling, or imported components with constrained supplier capacity.", drivers: ["Long lead time", "Allocation", "Supplier capacity"], recommended: "hard" },
+  "bulk-feedstock": { name: "Bulk / tank-constrained feedstock", icon: "cylinder", note: "Usable supply depends on tank, silo, yard, or warehouse capacity as well as inbound timing.", drivers: ["Storage capacity", "Inbound windows", "Minimum lots"], recommended: "watch" },
+  "interplant-transfer": { name: "Interplant or network transfer", icon: "arrow-left-right", note: "Stock exists elsewhere, but transfer orders, lanes, transit time, and receiving capacity determine feasibility.", drivers: ["Transfer orders", "Transit time", "Lane capacity"], recommended: "hard" },
+  "primary-packaging": { name: "Product-contact / primary packaging", icon: "package-check", note: "Packaging may be specification-bound, serialized, validated, or required for product release.", drivers: ["Specification", "Artwork / serialization", "Line compatibility"], recommended: "watch" },
+  "standard-packaging": { name: "Standard packaging and consumables", icon: "package-open", note: "Common cartons, labels, pallets, and consumables with credible expediting or substitution options.", drivers: ["Short lead time", "Expedite possible", "Substitutable"], recommended: "soft" },
+};
+
+const industrySupplyProfiles = {
+  "food-beverage": ["natural-feedstock", "cold-chain", "bulk-feedstock", "primary-packaging", "standard-packaging"],
+  pharma: ["qualified-material", "cold-chain", "interplant-transfer", "primary-packaging", "standard-packaging"],
+  "medical-devices": ["qualified-material", "long-lead-component", "interplant-transfer", "primary-packaging", "standard-packaging"],
+  chemicals: ["natural-feedstock", "qualified-material", "bulk-feedstock", "interplant-transfer", "standard-packaging"],
+  "metals-mining": ["natural-feedstock", "long-lead-component", "bulk-feedstock", "interplant-transfer"],
+  "building-materials": ["natural-feedstock", "bulk-feedstock", "interplant-transfer", "standard-packaging"],
+  automotive: ["long-lead-component", "interplant-transfer", "primary-packaging", "standard-packaging"],
+  aerospace: ["qualified-material", "long-lead-component", "interplant-transfer"],
+  electronics: ["qualified-material", "long-lead-component", "interplant-transfer", "standard-packaging"],
+  packaging: ["natural-feedstock", "bulk-feedstock", "interplant-transfer", "standard-packaging"],
+  "consumer-goods": ["natural-feedstock", "long-lead-component", "interplant-transfer", "standard-packaging"],
+  industrial: ["long-lead-component", "interplant-transfer", "standard-packaging"],
+  "energy-services": ["natural-feedstock", "qualified-material", "bulk-feedstock", "interplant-transfer"],
+  "operations-services": ["qualified-material", "long-lead-component", "interplant-transfer", "standard-packaging"],
 };
 
 const departmentTaxonomy = [

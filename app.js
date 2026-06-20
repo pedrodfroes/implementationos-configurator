@@ -153,6 +153,10 @@ function exportBrief() {
       driverAttributes: state.transitions?.driverAttributes || [],
     },
     billOfMaterials: state.bom,
+    criticalSupplies: {
+      confirmed: state.supplies.confirmed,
+      profiles: supplyProfiles().map((profile) => ({ ...profile, policy: supplyPolicy(profile) })),
+    },
     calendarAndCapacity: {
       terminology: calendarProfile(),
       profile: state.calendar,

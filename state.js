@@ -43,6 +43,7 @@ const initialState = {
     consumption: null,
     source: null,
   },
+  supplies: { policies: {}, confirmed: false },
   execution: {
     source: null,
     levels: [],
@@ -68,6 +69,10 @@ function load() {
       state = { ...clone(initialState), ...saved };
       if (!Array.isArray(saved.industryContexts) && saved.industry && saved.industrySpecialty) {
         state.industryContexts = [{ industry: saved.industry, specialty: saved.industrySpecialty }];
+      }
+      if (!("supplies" in saved) && Number(saved.max || 0) >= 11) {
+        state.i = 11;
+        state.max = Math.max(11, Number(state.max || 0) + 1);
       }
       if (!Array.isArray(saved.archetypes) && saved.archetype) state.archetypes = [saved.archetype];
       if (!("scope" in saved)) {

@@ -150,6 +150,7 @@ const steps = [
         existing >= 0 ? contexts.splice(existing, 1) : contexts.push({ industry: state.industry, specialty });
         state.industryContexts = contexts;
         state.industrySpecialty = contexts.at(-1)?.specialty || null;
+        state.supplies.confirmed = false;
         state.archetypes = state.archetypes.filter((id) => isArchetypeCompatible(id));
         state.erp = mode().erp;
         render();
@@ -157,6 +158,7 @@ const steps = [
       root.querySelectorAll("[data-remove-context]").forEach((button) => button.addEventListener("click", () => {
         state.industryContexts.splice(Number(button.dataset.removeContext), 1);
         state.industrySpecialty = state.industryContexts.at(-1)?.specialty || null;
+        state.supplies.confirmed = false;
         state.archetypes = state.archetypes.filter((id) => isArchetypeCompatible(id));
         state.erp = mode().erp;
         render();
@@ -524,6 +526,56 @@ const steps = [
     },
   },
   {
+    id: "supplies", phase: "Model", nav: "Critical supplies",
+    title: "Which supplies can stop the schedule?",
+    sub: "Classify representative material families by operational substitutability. Purchase orders, transfer orders, usable stock, expiry, and storage capacity become hard constraints only where recovery is not credible.",
+    hint: "Review the industry recommendations and confirm the supply policy.",
+    gate: () => !!state.supplies?.confirmed,
+    body: () => {
+      const profiles = supplyProfiles();
+      const counts = profiles.reduce((result, profile) => {
+        result[supplyPolicy(profile)] += 1;
+        return result;
+      }, { hard: 0, watch: 0, soft: 0 });
+      return `
+        <div class="supply-synthesis">
+          <div><span>Industry-informed policy</span><strong>${profiles.length} representative supply families</strong></div>
+          <div class="supply-counts"><b class="hard">${counts.hard} hard</b><b class="watch">${counts.watch} watch</b><b class="soft">${counts.soft} soft</b></div>
+        </div>
+        <div class="supply-matrix" role="table" aria-label="Supply criticality policy">
+          <div class="supply-header" role="row"><span>Representative supply family</span><span>Criticality drivers</span><span>Scheduling policy</span></div>
+          ${profiles.map((profile) => {
+            const policy = supplyPolicy(profile);
+            return `<div class="supply-row" role="row">
+              <div class="supply-identity"><i data-lucide="${profile.icon}"></i><span><strong>${escapeHtml(profile.name)}</strong><small>${escapeHtml(profile.note)}</small></span></div>
+              <div class="supply-drivers">${profile.drivers.map((driver) => `<span>${escapeHtml(driver)}</span>`).join("")}</div>
+              <div class="supply-policy" aria-label="Policy for ${escapeHtml(profile.name)}">
+                <button type="button" class="${policy === "hard" ? "active hard" : ""}" data-supply-profile="${profile.id}" data-supply-policy="hard" title="Blocks scheduling when confirmed supply is insufficient">Hard</button>
+                <button type="button" class="${policy === "watch" ? "active watch" : ""}" data-supply-profile="${profile.id}" data-supply-policy="watch" title="Warns and scores risk without blocking every schedule">Watch</button>
+                <button type="button" class="${policy === "soft" ? "active soft" : ""}" data-supply-profile="${profile.id}" data-supply-policy="soft" title="Assumes expediting, substitution, or supplier recovery">Soft</button>
+              </div>
+            </div>`;
+          }).join("")}
+        </div>
+        <div class="supply-confirmation">
+          <div><i data-lucide="info"></i><p><strong>Hard</strong> means APS must respect usable inventory plus dated purchase and transfer supply. <strong>Soft</strong> means planners accept recovery outside the current system picture.</p></div>
+          <button type="button" class="${state.supplies.confirmed ? "active" : ""}" id="confirmSupplies"><i data-lucide="${state.supplies.confirmed ? "circle-check" : "shield-check"}"></i><span>${state.supplies.confirmed ? "Policy confirmed" : "Confirm supply policy"}</span></button>
+        </div>
+      `;
+    },
+    attach: (root) => {
+      root.querySelectorAll("[data-supply-profile]").forEach((button) => button.addEventListener("click", () => {
+        state.supplies.policies[button.dataset.supplyProfile] = button.dataset.supplyPolicy;
+        state.supplies.confirmed = false;
+        render();
+      }));
+      root.querySelector("#confirmSupplies")?.addEventListener("click", () => {
+        state.supplies.confirmed = true;
+        render();
+      });
+    },
+  },
+  {
     id: "execution", phase: "Model", nav: "Execution feedback",
     title: "How does actual execution return to planning?",
     sub: () => `Configure the feedback contract separately from the ${profile().route.toLowerCase()}. MES events and ${profile().badge} confirmations may describe the same work at different levels and times.`,
@@ -695,6 +747,7 @@ const steps = [
         ["Item attributes", attrFamiliesConfirmed ? "done" : "open", attrFamiliesConfirmed ? `${attrPicksTotal} attribute${attrPicksTotal === 1 ? "" : "s"} across ${attrFamiliesConfirmed} famil${attrFamiliesConfirmed === 1 ? "y" : "ies"}` : "Not characterized"],
         ["Setup & changeovers", transitionsConfigured() ? "done" : "open", state.transitions?.types?.length ? `${transitionTypes.filter((x) => state.transitions.types.includes(x.id)).map((x) => x.name).join(", ")} · ${state.transitions.triggers.length} trigger${state.transitions.triggers.length === 1 ? "" : "s"}` : "Not characterized"],
         ["BOM profile", state.bom?.source ? "done" : "open", state.bom?.source ? `${state.bom.structure} · ${state.bom.consumption} · ${state.bom.source}` : "Not characterized"],
+        ["Critical supplies", state.supplies?.confirmed ? "done" : "open", state.supplies?.confirmed ? `${supplyProfiles().filter((profile) => supplyPolicy(profile) === "hard").length} hard constraints confirmed` : "Policy not reviewed"],
         ["Execution feedback", state.execution?.source ? "done" : "open", state.execution?.source ? `${executionSourceLabel()} · ${state.execution.events.join(", ")}` : "Not configured"],
         ["Migration risk", "info", state.migration ? "S/4 migration on roadmap" : "No migration planned"],
       ];
@@ -735,6 +788,7 @@ const steps = [
           <div class="summary-card"><span>Item attributes</span><strong>${attrPicksTotal} captured</strong><small>${escapeHtml(attributeProfile().family)}</small></div>
           <div class="summary-card"><span>Setup & cleaning</span><strong>${state.transitions?.types?.length ? `${state.transitions.types.length} transition type${state.transitions.types.length === 1 ? "" : "s"}` : "Pending"}</strong><small>${state.transitions?.concurrency ? escapeHtml(transitionConcurrency.find((x) => x.id === state.transitions.concurrency)?.name || "") : "concurrency not set"}</small></div>
           <div class="summary-card"><span>BOM</span><strong>${state.bom?.structure ? escapeHtml(state.bom.structure) : "Pending"}</strong><small>${state.bom?.source ? escapeHtml(state.bom.source) : "integration grain not set"}</small></div>
+          <div class="summary-card"><span>Critical supplies</span><strong>${state.supplies?.confirmed ? `${supplyProfiles().filter((profile) => supplyPolicy(profile) === "hard").length} hard constraints` : "Pending"}</strong><small>${state.supplies?.confirmed ? "PO, transfer, stock, shelf-life and storage policy" : "supply policy not reviewed"}</small></div>
           <div class="summary-card"><span>Capacity</span><strong>${state.calendar?.layering ? escapeHtml(state.calendar.layering) : "Pending"}</strong><small>${state.calendar?.pattern ? escapeHtml(state.calendar.pattern) : "calendar pattern not set"}</small></div>
           <div class="summary-card"><span>Execution</span><strong>${escapeHtml(executionSourceLabel())}</strong><small>${state.execution?.events?.length ? escapeHtml(state.execution.events.join(" · ")) : "feedback events not set"}</small></div>
           <div class="summary-card"><span>Decisions</span><strong>${decisions.length} governed</strong><small>${decisions.length ? "merge history travels with handoff" : "no branch merges"}</small></div>

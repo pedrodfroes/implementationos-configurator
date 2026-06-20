@@ -36,6 +36,13 @@ function compatibleContextLabels(id) {
   return selectedIndustryContexts().filter((context) => industryArchetypeCompatibility[context.industry]?.includes(id)).map((context) => context.specialty);
 }
 function isArchetypeCompatible(id) { return compatibleContextLabels(id).length > 0; }
+function supplyProfiles() {
+  const ids = new Set();
+  selectedIndustryContexts().forEach((context) => (industrySupplyProfiles[context.industry] || []).forEach((id) => ids.add(id)));
+  if (!ids.size) ["interplant-transfer", "standard-packaging"].forEach((id) => ids.add(id));
+  return [...ids].map((id) => ({ id, ...supplyProfileCatalog[id] })).filter((item) => item.name);
+}
+function supplyPolicy(profile) { return state.supplies?.policies?.[profile.id] || profile.recommended; }
 function executionSourceLabel() {
   return { erp: `${profile().badge} confirmations`, mes: "MES execution events", hybrid: `Hybrid MES + ${profile().badge}` }[state.execution?.source] || "Not configured";
 }
@@ -123,6 +130,7 @@ function readiness() {
   if (attrConfirmed) s += Math.min(10, attrConfirmed * 2);
   if (transitionsConfigured()) s += 8;
   if (state.bom?.structure && state.bom?.featuresConfirmed && state.bom?.consumption && state.bom?.source) s += 8;
+  if (state.supplies?.confirmed) s += 6;
   if (state.execution?.source && state.execution?.levels?.length && state.execution?.events?.length && state.execution?.quantitiesConfirmed) s += 8;
   if (state.variant && state.variant !== "active") s += 6;
   if (state.migration) s -= 4;
