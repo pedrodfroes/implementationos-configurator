@@ -373,6 +373,55 @@ const steps = [
       }));
     },
   },
+  {
+    id: "volume-storage", phase: "Model", nav: "Volume storage",
+    title: "Do tanks or other volume assets shape feasibility?",
+    sub: "Model tanks, silos, vats, drums, bins, and connected buffers as schedule-dependent volume resources - not as warehouses or ordinary machines.",
+    hint: "Confirm whether volume-storage scheduling is in scope and review its behaviors.",
+    gate: () => state.volumeStorage?.present === false || !!(state.volumeStorage?.present && state.volumeStorage?.confirmed && state.volumeStorage?.behaviors?.length),
+    body: () => {
+      const storage = state.volumeStorage || initialState.volumeStorage;
+      return `
+        ${volumeStorageRecommended() ? `<div class="volume-recommendation"><i data-lucide="sparkles"></i><span><strong>Recommended from industry coverage</strong>Process-oriented contexts commonly require explicit volume-storage scheduling.</span></div>` : ""}
+        <div class="volume-presence" role="group" aria-label="Volume storage scope">
+          <button type="button" class="${storage.present === true ? "active" : ""}" data-volume-present="true" aria-pressed="${storage.present === true}"><i data-lucide="cylinder"></i><span><strong>Volume assets are in scope</strong><small>Tanks, silos, vats, drums, bins, or intermediate buffers affect feasibility</small></span></button>
+          <button type="button" class="${storage.present === false ? "active" : ""}" data-volume-present="false" aria-pressed="${storage.present === false}"><i data-lucide="circle-slash-2"></i><span><strong>Not relevant to this project</strong><small>Materials use ordinary inventory locations or non-volume resources</small></span></button>
+        </div>
+        ${storage.present ? `
+          <div class="volume-heading"><div><span>Tank scheduling behaviors</span><strong>${storage.behaviors.length} of ${volumeStorageBehaviors.length} represented</strong></div><button type="button" id="selectAllVolume">${storage.behaviors.length === volumeStorageBehaviors.length ? "Clear all" : "Select complete model"}</button></div>
+          <div class="volume-grid">
+            ${volumeStorageBehaviors.map((behavior, index) => `<button type="button" class="volume-behavior${storage.behaviors.includes(behavior.id) ? " active" : ""}" data-volume-behavior="${behavior.id}" aria-pressed="${storage.behaviors.includes(behavior.id)}"><span>${String(index + 1).padStart(2, "0")}</span><i data-lucide="${behavior.icon}"></i><div><strong>${escapeHtml(behavior.name)}</strong><small>${escapeHtml(behavior.note)}</small></div><i data-lucide="check"></i></button>`).join("")}
+          </div>
+          <div class="volume-confirmation"><p><strong>Avoid fixed durations and rules of thumb.</strong> Feasible schedules must dynamically couple occupancy, quantity, topology, sequence, and product state.</p><button type="button" class="${storage.confirmed ? "active" : ""}" id="confirmVolume" ${storage.behaviors.length ? "" : "disabled"}><i data-lucide="${storage.confirmed ? "circle-check" : "shield-check"}"></i><span>${storage.confirmed ? "Volume model confirmed" : "Confirm volume model"}</span></button></div>
+        ` : ""}
+      `;
+    },
+    attach: (root) => {
+      root.querySelectorAll("[data-volume-present]").forEach((button) => button.addEventListener("click", () => {
+        const present = button.dataset.volumePresent === "true";
+        state.volumeStorage.present = present;
+        state.volumeStorage.behaviors = present ? [...volumeStorageBehaviors.map((item) => item.id)] : [];
+        state.volumeStorage.confirmed = !present;
+        render();
+      }));
+      root.querySelectorAll("[data-volume-behavior]").forEach((button) => button.addEventListener("click", () => {
+        const selected = new Set(state.volumeStorage.behaviors);
+        selected.has(button.dataset.volumeBehavior) ? selected.delete(button.dataset.volumeBehavior) : selected.add(button.dataset.volumeBehavior);
+        state.volumeStorage.behaviors = [...selected];
+        state.volumeStorage.confirmed = false;
+        render();
+      }));
+      root.querySelector("#selectAllVolume")?.addEventListener("click", () => {
+        state.volumeStorage.behaviors = state.volumeStorage.behaviors.length === volumeStorageBehaviors.length ? [] : volumeStorageBehaviors.map((item) => item.id);
+        state.volumeStorage.confirmed = false;
+        render();
+      });
+      root.querySelector("#confirmVolume")?.addEventListener("click", () => {
+        state.volumeStorage.confirmed = true;
+        render();
+      });
+    },
+  },
   ...attributeConcepts.map(makeAttributeStep),
   {
     id: "transitions", phase: "Model", nav: "Setup & cleaning",
@@ -800,6 +849,7 @@ const steps = [
         ["Department taxonomy", state.departmentTypes?.length ? "done" : "open", state.departmentTypes?.length ? `${state.departmentTypes.length} semantic types selected` : "Not configured"],
         ["Calendars & capacity", state.calendar?.layering ? "done" : "open", state.calendar?.layering ? `${calendarProfile().base} · ${state.calendar.pattern} · ${state.calendar.exceptions}` : "Not characterized"],
         ["Resource taxonomy", state.resourceTypes?.length ? "done" : "open", state.resourceTypes?.length ? `${state.resourceTypes.length} capacity-object types selected` : "Not configured"],
+        ["Volume storage", state.volumeStorage?.present === false || state.volumeStorage?.confirmed ? "done" : "open", state.volumeStorage?.present === false ? "Not in scope" : state.volumeStorage?.confirmed ? `${state.volumeStorage.behaviors.length} tank behaviors modeled` : "Not characterized"],
         ["Item attributes", attrFamiliesConfirmed ? "done" : "open", attrFamiliesConfirmed ? `${attrPicksTotal} attribute${attrPicksTotal === 1 ? "" : "s"} across ${attrFamiliesConfirmed} famil${attrFamiliesConfirmed === 1 ? "y" : "ies"}` : "Not characterized"],
         ["Setup & changeovers", transitionsConfigured() ? "done" : "open", state.transitions?.types?.length ? `${transitionTypes.filter((x) => state.transitions.types.includes(x.id)).map((x) => x.name).join(", ")} · ${state.transitions.triggers.length} trigger${state.transitions.triggers.length === 1 ? "" : "s"}` : "Not characterized"],
         ["BOM profile", state.bom?.source ? "done" : "open", state.bom?.source ? `${state.bom.structure} · ${state.bom.consumption} · ${state.bom.source}` : "Not characterized"],
@@ -842,6 +892,7 @@ const steps = [
           <div class="summary-card"><span>Objective</span><strong>${state.scope === "aps-ds" ? "APS / Detailed Scheduling" : "Pending"}</strong><small>hours-to-weeks planning horizon</small></div>
           <div class="summary-card"><span>Industry coverage</span><strong>${industryLabel() ? escapeHtml(industryLabel()) : "Pending"}</strong><small>${selectedIndustryContexts().length ? escapeHtml(selectedIndustryContexts().map((context) => context.specialty).join(" · ")) : "context not selected"}</small></div>
           <div class="summary-card"><span>Representative data</span><strong>${generated.departments.length} departments · ${generated.resources.length} resources</strong><small>synthetic and replaceable</small></div>
+          <div class="summary-card"><span>Volume storage</span><strong>${state.volumeStorage?.present ? `${state.volumeStorage.behaviors.length} behaviors` : state.volumeStorage?.present === false ? "Not in scope" : "Pending"}</strong><small>${state.volumeStorage?.present ? "dynamic occupancy, flow and eligibility model" : "tank scheduling profile"}</small></div>
           <div class="summary-card"><span>Item attributes</span><strong>${attrPicksTotal} captured</strong><small>${escapeHtml(attributeProfile().family)}</small></div>
           <div class="summary-card"><span>Setup & cleaning</span><strong>${state.transitions?.types?.length ? `${state.transitions.types.length} transition type${state.transitions.types.length === 1 ? "" : "s"}` : "Pending"}</strong><small>${state.transitions?.concurrency ? escapeHtml(transitionConcurrency.find((x) => x.id === state.transitions.concurrency)?.name || "") : "concurrency not set"}</small></div>
           <div class="summary-card"><span>BOM</span><strong>${state.bom?.structure ? escapeHtml(state.bom.structure) : "Pending"}</strong><small>${state.bom?.source ? escapeHtml(state.bom.source) : "integration grain not set"}</small></div>

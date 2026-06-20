@@ -43,6 +43,7 @@ const initialState = {
     consumption: null,
     source: null,
   },
+  volumeStorage: { present: null, behaviors: [], confirmed: false },
   supplies: { policies: {}, confirmed: false },
   workforce: { scopes: {}, confirmed: false },
   execution: {
@@ -79,6 +80,11 @@ function load() {
         const wfIdx = steps.findIndex((step) => step.id === "workforce");
         if (wfIdx >= 0 && Number(saved.i || 0) >= wfIdx) state.i = Number(saved.i) + 1;
         if (wfIdx >= 0 && Number(saved.max || 0) >= wfIdx) state.max = Number(saved.max) + 1;
+      }
+      if (!("volumeStorage" in saved)) {
+        const vsIdx = steps.findIndex((step) => step.id === "volume-storage");
+        if (vsIdx >= 0 && Number(saved.i || 0) >= vsIdx) state.i = Number(saved.i) + 1;
+        if (vsIdx >= 0 && Number(saved.max || 0) >= vsIdx) state.max = Number(saved.max) + 1;
       }
       if (!Array.isArray(saved.archetypes) && saved.archetype) state.archetypes = [saved.archetype];
       if (!("scope" in saved)) {

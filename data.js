@@ -205,6 +205,20 @@ const resourceTaxonomy = [
   { id: "external-capacity", name: "External capacity", icon: "building-2", department: "external", note: "Suppliers, subcontractors, tollers, and external laboratories" },
 ];
 
+// Tanks, silos, vats, drums, bins, and connected buffers are schedule-dependent
+// volume resources — not warehouses or ordinary machines. Each behavior an APS
+// model may need to represent is its own selectable card in the volume step.
+const volumeStorageBehaviors = [
+  { id: "dynamic-hold", icon: "pause", name: "Independent inflow, hold, and outflow", note: "Storage duration is schedule-dependent; feeding and consuming operations have independent timing and rates." },
+  { id: "single-material", icon: "circle-dot", name: "Single-material occupancy", note: "Any occupied volume can reserve the whole vessel against other materials or batches until empty and released." },
+  { id: "buffer", icon: "waves", name: "Buffer behavior", note: "Minimum fill, maximum heel, multiple inflows/outflows, and unequal rates protect upstream or downstream throughput." },
+  { id: "pipe-network", icon: "git-fork", name: "Pipe and transfer topology", note: "Physical connections, shared-line capacity, simultaneous occupation, flow rates, and product compatibility constrain routing." },
+  { id: "attribute-cleaning", icon: "sparkles", name: "Attribute-driven cleaning", note: "Cleaning depends on sequence attributes such as allergen, color, quality, brand, or lot rather than an unmaintainable SKU matrix." },
+  { id: "size-batch", icon: "maximize-2", name: "Tank size and dynamic batch sizing", note: "Different capacities, formula scaling, due dates, and future demand determine vessel choice and whether batches split." },
+  { id: "eligibility", icon: "list-checks", name: "Tank eligibility and auxiliary resources", note: "Products use overlapping tank groups and may also require stirrers, tools, CIP sets, operators, or QA standing time." },
+  { id: "state-change", icon: "refresh-cw", name: "Material state transformation", note: "Fermentation, maturation, incubation, assay, or QA release can change identity, quantity, status, and earliest outflow." },
+];
+
 // The same conceptual thing — a descriptive/classifying trait on a material —
 // has a different NAME and STRUCTURE in every ERP. The Model phase must speak
 // the client's dialect, so each attribute family resolves to the right word.

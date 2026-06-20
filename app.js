@@ -152,6 +152,10 @@ function exportBrief() {
       drivers: transitionDrivers.filter((x) => state.transitions?.drivers?.includes(x.id)).map(({ id, name }) => ({ id, name })),
       driverAttributes: state.transitions?.driverAttributes || [],
     },
+    volumeStorage: {
+      ...state.volumeStorage,
+      behaviorDetails: volumeStorageBehaviors.filter((behavior) => state.volumeStorage.behaviors.includes(behavior.id)),
+    },
     billOfMaterials: state.bom,
     criticalSupplies: {
       confirmed: state.supplies.confirmed,

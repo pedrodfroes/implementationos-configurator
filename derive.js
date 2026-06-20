@@ -43,6 +43,10 @@ function supplyProfiles() {
   return [...ids].map((id) => ({ id, ...supplyProfileCatalog[id] })).filter((item) => item.name);
 }
 function supplyPolicy(profile) { return state.supplies?.policies?.[profile.id] || profile.recommended; }
+function volumeStorageRecommended() {
+  const processSectors = new Set(["food-beverage", "pharma", "chemicals", "metals-mining", "building-materials", "packaging", "energy-services"]);
+  return selectedIndustryContexts().some((context) => processSectors.has(context.industry));
+}
 function laborIntensity() {
   const rank = { core: 3, supporting: 2, minimal: 1 };
   let best = 0, label = "supporting";
@@ -138,6 +142,7 @@ function readiness() {
   if (state.calendar?.layering && state.calendar?.pattern && state.calendar?.exceptions && state.calendar?.modifiersConfirmed) s += 8;
   if (state.constraint) s += 6;
   if (state.resourceTypes?.length) s += 10;
+  if (state.volumeStorage?.present === false || state.volumeStorage?.confirmed) s += 6;
   const attrConfirmed = Object.values(state.attr || {}).filter((slot) => slot?.confirmed).length;
   if (attrConfirmed) s += Math.min(10, attrConfirmed * 2);
   if (transitionsConfigured()) s += 8;
