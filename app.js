@@ -94,33 +94,54 @@ const archetypeIcons = {
 };
 
 const industries = [
-  { id: "pharma", name: "Pharmaceutical / Biopharma", group: "Life sciences", icon: "pill", focus: "GMP batches, potency, genealogy, cleaning, QA release", compliance: "GxP · electronic records · validated processes" },
-  { id: "pesticides", name: "Crop Protection / Pesticides", group: "Agrochemicals", icon: "sprout", focus: "Active ingredients, campaign cleaning, hazardous segregation, pack labels", compliance: "Product registrations · HSE · environmental controls" },
-  { id: "medical-devices", name: "Medical Devices", group: "Life sciences", icon: "stethoscope", focus: "Device history, UDI, controlled assembly, sterilization", compliance: "QMS · traceability · regulated change control" },
   { id: "food-beverage", name: "Food & Beverage", group: "Consumer process", icon: "utensils", focus: "Shelf life, allergens, recipes, yield, sanitation", compliance: "Food safety · lot traceability · labeling" },
-  { id: "chemicals", name: "Chemicals", group: "Process industries", icon: "flask-conical", focus: "Formulas, tanks, campaigns, co-products, hazardous materials", compliance: "SDS · process safety · environmental controls" },
-  { id: "cpg", name: "Consumer Packaged Goods", group: "Consumer products", icon: "package", focus: "High-SKU packaging, postponement, promotions, changeovers", compliance: "Label control · market variants · traceability" },
-  { id: "automotive", name: "Automotive", group: "Discrete manufacturing", icon: "car", focus: "Sequenced supply, variants, line balance, supplier constraints", compliance: "PPAP · serial genealogy · quality gates" },
-  { id: "industrial", name: "Industrial Equipment", group: "Discrete manufacturing", icon: "cog", focus: "BOM depth, engineer-to-order, skills, tools, long lead parts", compliance: "Configuration control · inspection evidence" },
-  { id: "electronics", name: "Electronics / Semiconductor", group: "High-tech", icon: "microchip", focus: "Reentrant flows, yield, alternates, cleanroom tools", compliance: "Material genealogy · process control · export rules" },
-  { id: "aerospace", name: "Aerospace & Defense", group: "Regulated discrete", icon: "plane", focus: "Effectivity, serialized parts, scarce skills, project networks", compliance: "Airworthiness · full traceability · controlled data" },
-  { id: "metals-mining", name: "Metals / Mining", group: "Primary industries", icon: "mountain", focus: "Blending, grades, campaign assets, energy, extraction", compliance: "Assay · chain of custody · environmental constraints" },
+  { id: "pharma", name: "Pharmaceuticals & Biotech", group: "Life sciences", icon: "pill", focus: "GMP batches, potency, genealogy, cleaning, QA release", compliance: "GxP · electronic records · validated processes" },
+  { id: "medical-devices", name: "Medical Devices", group: "Life sciences", icon: "stethoscope", focus: "Device history, UDI, controlled assembly, sterilization", compliance: "QMS · traceability · regulated change control" },
+  { id: "chemicals", name: "Chemicals, Plastics & Polymers", group: "Process industries", icon: "flask-conical", focus: "Formulas, tanks, campaigns, co-products, hazardous materials", compliance: "SDS · process safety · environmental controls" },
+  { id: "metals-mining", name: "Metals & Heavy Industry", group: "Primary industries", icon: "mountain", focus: "Blending, grades, campaign assets, energy, extraction", compliance: "Assay · chain of custody · environmental constraints" },
   { id: "building-materials", name: "Building Materials", group: "Process industries", icon: "brick-wall", focus: "Kilns, campaigns, bulk logistics, energy-intensive assets", compliance: "Quality certificates · emissions · batch traceability" },
+  { id: "automotive", name: "Automotive & Mobility", group: "Discrete manufacturing", icon: "car", focus: "Sequenced supply, variants, line balance, supplier constraints", compliance: "PPAP · serial genealogy · quality gates" },
+  { id: "aerospace", name: "Aerospace & Defense", group: "Regulated discrete", icon: "plane", focus: "Effectivity, serialized parts, scarce skills, project networks", compliance: "Airworthiness · full traceability · controlled data" },
+  { id: "electronics", name: "Electronics & High-Tech", group: "High-tech", icon: "microchip", focus: "Reentrant flows, yield, alternates, cleanroom tools", compliance: "Material genealogy · process control · export rules" },
+  { id: "packaging", name: "Packaging", group: "Conversion & packing", icon: "package", focus: "High-SKU conversion, printing, filling, packing, and changeovers", compliance: "Label control · market variants · traceability" },
+  { id: "consumer-goods", name: "Paper, Textile & Consumer Goods", group: "Consumer products", icon: "shirt", focus: "Materials, variants, seasonal demand, finishing, and packing", compliance: "Product safety · labeling · source traceability" },
+  { id: "industrial", name: "Industrial Equipment", group: "Discrete manufacturing", icon: "cog", focus: "BOM depth, engineer-to-order, skills, tools, long lead parts", compliance: "Configuration control · inspection evidence" },
+  { id: "energy-services", name: "Energy, Utilities & Industrial Services", group: "Asset intensive", icon: "zap", focus: "Continuous assets, maintenance windows, utilities, and field constraints", compliance: "Process safety · asset integrity · environmental controls" },
+  { id: "operations-services", name: "MRO & Resource-Constrained Services", group: "Beyond manufacturing", icon: "wrench", focus: "Finite skills, bays, tools, sequence constraints, and due dates", compliance: "Work evidence · safety · service traceability" },
 ];
+
+const industrySpecialties = {
+  "food-beverage": ["General food & beverage", "Spirits / distilleries", "Breweries", "Wine", "Juice", "Soft drinks", "Bottled water", "Dairy", "Cheese", "Yogurt", "Ice cream", "Meat processing", "Poultry", "Seafood", "Bakery", "Biscuits / cookies", "Chocolate", "Confectionery", "Sugar refining", "Coffee roasting", "Tea blending", "Frozen foods", "Ready meals", "Sauces / condiments", "Canned foods", "Snacks / chips", "Cereals", "Infant nutrition", "Pet food", "Nutraceutical foods"],
+  pharma: ["General pharmaceuticals & biotech", "Injectables", "Sterile fill-finish", "Vaccines", "Biologics", "Cell and gene therapy", "API", "OSD tablets", "Capsules", "Softgels", "Creams / ointments", "Liquids / syrups", "Inhalers", "Medical cannabis", "Contract manufacturing (CDMO / CMO)", "Packaging and serialization", "Laboratory reagent production", "Blood products / plasma fractionation"],
+  "medical-devices": ["General medical devices", "Sterile disposable devices", "Diagnostic devices", "Implants", "Surgical instruments", "Combination products", "Medical electronics", "Contract device manufacturing"],
+  chemicals: ["Specialty chemicals", "Commodity chemicals", "Paints and coatings", "Adhesives", "Resins", "Solvents", "Fertilizers", "Agrochemicals / pesticides", "Industrial gases", "Lubricants", "Detergents", "Cosmetics", "Fragrances", "Personal care", "Cleaning products", "Battery chemicals", "Pulp chemicals", "Water treatment chemicals", "Plastic extrusion", "Plastic injection molding", "Plastic rotomolding", "Blow molding", "Thermoforming", "Film extrusion", "Pipe extrusion", "Rubber molding", "Tires", "Hoses", "Seals and gaskets", "Foam products", "Composite materials", "Packaging plastics", "Recycled plastics processing"],
+  "metals-mining": ["Steelworks", "Mini-mills", "Foundries", "Forging", "Rolling mills", "Aluminum smelting", "Aluminum extrusion", "Copper processing", "Wire and cable", "Metal stamping", "Machining", "Heat treatment", "Surface treatment", "Galvanizing", "Powder metallurgy", "Toolmaking", "Industrial castings", "Mining / primary extraction"],
+  "building-materials": ["Cement", "Concrete", "Precast concrete", "Aggregates", "Asphalt", "Bricks", "Ceramics", "Tiles", "Glass", "Insulation materials", "Drywall / gypsum board", "Roofing materials", "Pipes and fittings", "Wood panels", "Flooring"],
+  automotive: ["Automotive assembly", "Powertrain", "EV batteries", "Battery packs", "Tires", "Seats", "Wiring harnesses", "Stamping", "Paint shops", "Injection-molded components", "Glass components", "Brakes", "Suspension", "Electronics modules", "Aftermarket parts", "Rail components", "Shipbuilding", "Heavy vehicles", "Agricultural machinery"],
+  aerospace: ["Aerospace components", "Aircraft assembly", "Engines and propulsion", "Avionics", "Space systems", "Defense manufacturing"],
+  electronics: ["Semiconductors", "PCB assembly", "Consumer electronics", "Industrial electronics", "Telecom equipment", "Sensors", "Batteries", "Solar panels", "LED manufacturing", "Data center hardware", "Medical electronics", "Appliances", "Cable assemblies"],
+  packaging: ["Bottling", "Canning", "Cartoning", "Labels", "Flexible packaging", "Corrugated packaging", "Glass bottles", "Aluminum cans", "Plastic bottles", "Closures / caps", "Blister packaging", "Pharmaceutical packaging", "Food packaging", "Palletizing operations"],
+  "consumer-goods": ["Paper mills", "Tissue products", "Printing", "Publishing / commercial print", "Textile weaving", "Textile dyeing", "Apparel manufacturing", "Footwear", "Furniture", "Mattresses", "Household goods", "Toys", "Sporting goods", "Luxury goods", "Jewelry manufacturing", "Eyewear"],
+  industrial: ["General industrial equipment", "Power equipment manufacturing", "Wind turbine components", "Solar equipment manufacturing", "Nuclear component manufacturing", "Large capital equipment assembly", "Engineering workshops", "Tool rooms"],
+  "energy-services": ["Oil refining", "Petrochemicals", "LNG operations", "Biofuels", "Hydrogen production", "Waste processing", "Recycling plants", "Water treatment operations", "Industrial maintenance shutdowns"],
+  "operations-services": ["MRO / maintenance repair overhaul", "Aircraft maintenance", "Rail maintenance", "Fleet workshops", "Ship repair", "Industrial maintenance", "Construction prefabrication", "Hospital operating rooms", "Lab scheduling", "Warehouse value-added services", "Distribution center labor planning"],
+};
 
 const industryArchetypeCompatibility = {
   pharma: ["batch-campaign", "continuous-process", "discrete-assembly", "flow-shop", "packaging-postponement", "maturation-aging"],
-  pesticides: ["batch-campaign", "continuous-process", "flow-shop", "packaging-postponement"],
   "medical-devices": ["discrete-assembly", "cto-eto", "job-shop", "flow-shop", "packaging-postponement"],
   "food-beverage": ["batch-campaign", "continuous-process", "flow-shop", "packaging-postponement", "perishable-food", "maturation-aging"],
-  chemicals: ["batch-campaign", "continuous-process", "packaging-postponement", "maturation-aging"],
-  cpg: ["batch-campaign", "continuous-process", "discrete-assembly", "flow-shop", "packaging-postponement", "perishable-food"],
+  chemicals: ["batch-campaign", "continuous-process", "discrete-assembly", "flow-shop", "packaging-postponement", "maturation-aging"],
+  packaging: ["batch-campaign", "continuous-process", "discrete-assembly", "flow-shop", "packaging-postponement"],
+  "consumer-goods": ["batch-campaign", "continuous-process", "discrete-assembly", "job-shop", "flow-shop", "packaging-postponement", "perishable-food"],
   automotive: ["discrete-assembly", "cto-eto", "job-shop", "flow-shop"],
   industrial: ["discrete-assembly", "cto-eto", "job-shop", "flow-shop", "maintenance-turnaround"],
   electronics: ["discrete-assembly", "cto-eto", "job-shop", "flow-shop", "semiconductor-fab"],
   aerospace: ["discrete-assembly", "cto-eto", "job-shop", "maintenance-turnaround"],
-  "metals-mining": ["batch-campaign", "continuous-process", "flow-shop", "mining-primary"],
+  "metals-mining": ["batch-campaign", "continuous-process", "discrete-assembly", "job-shop", "flow-shop", "mining-primary"],
   "building-materials": ["batch-campaign", "continuous-process", "flow-shop", "maturation-aging"],
+  "energy-services": ["batch-campaign", "continuous-process", "flow-shop", "maintenance-turnaround"],
+  "operations-services": ["cto-eto", "job-shop", "maintenance-turnaround", "construction-project", "healthcare-capacity", "field-service"],
 };
 
 const departmentTaxonomy = [
@@ -164,6 +185,7 @@ const initialState = {
   industryFirst: true,
   archetypes: [],
   industry: null,
+  industrySpecialty: null,
   erp: "sap_pi",
   migration: null,
   calendar: {
@@ -260,6 +282,7 @@ function selectedArchetypes() {
   return (state.archetypes || []).map((id) => planningArchetypes.find((item) => item.id === id)).filter(Boolean);
 }
 function industry() { return industries.find((item) => item.id === state.industry) || null; }
+function industryLabel() { return state.industrySpecialty || industry()?.name || null; }
 function isArchetypeCompatible(id) { return !!industryArchetypeCompatibility[state.industry]?.includes(id); }
 function executionSourceLabel() {
   return { erp: `${profile().badge} confirmations`, mes: "MES execution events", hybrid: `Hybrid MES + ${profile().badge}` }[state.execution?.source] || "Not configured";
@@ -316,7 +339,7 @@ function readiness() {
   let s = 16;
   if (state.scope) s += 12;
   if (state.archetypes?.length) s += 8;
-  if (state.industry) s += 6;
+  if (state.industry && state.industrySpecialty) s += 6;
   if (state.departmentTypes?.length) s += 8;
   if (state.calendar?.layering && state.calendar?.pattern && state.calendar?.exceptions && state.calendar?.modifiersConfirmed) s += 8;
   if (state.constraint) s += 6;
@@ -380,7 +403,7 @@ const steps = [
   {
     id: "archetype", phase: "Characterize", nav: "Archetype",
     title: "What are you implementing?",
-    sub: () => `Select every operating pattern that materially shapes ${industry()?.name || "the selected industry"}. Incompatible patterns remain visible for context but cannot enter the model.`,
+    sub: () => `Select every operating pattern that materially shapes ${industryLabel() || "the selected industry"}. Incompatible patterns remain visible for context but cannot enter the model.`,
     hint: "Choose at least one archetype to continue.",
     gate: () => state.archetypes?.length > 0,
     body: () => {
@@ -397,7 +420,7 @@ const steps = [
             (a) => `
           <button class="pick-card${state.archetypes.includes(a.id) ? " active" : ""}${isArchetypeCompatible(a.id) ? "" : " inactive"}" type="button"
             ${isArchetypeCompatible(a.id) ? `data-arch="${a.id}"` : "disabled"} data-mode="${a.mode}" aria-pressed="${state.archetypes.includes(a.id)}"
-            title="${isArchetypeCompatible(a.id) ? `Compatible with ${escapeHtml(industry()?.name || "selected industry")}` : `Not supported for ${escapeHtml(industry()?.name || "selected industry")}`}">
+            title="${isArchetypeCompatible(a.id) ? `Compatible with ${escapeHtml(industryLabel() || "selected industry")}` : `Not supported for ${escapeHtml(industryLabel() || "selected industry")}`}">
             <span class="pick-head"><i data-lucide="${archetypeIcons[a.id]}"></i><span class="pick-mode">${escapeHtml(modeProfiles[a.mode].label)}</span></span>
             <strong>${escapeHtml(a.name)}</strong>
             <p>${escapeHtml(a.core)}</p>
@@ -421,36 +444,66 @@ const steps = [
   },
   {
     id: "industry", phase: "Characterize", nav: "Industry context",
-    title: "Which industry context shapes the implementation?",
-    sub: "Industry does not replace the operating archetype. It adds the regulatory, quality, traceability, safety, and terminology lens that makes the same production pattern behave differently.",
-    hint: "Choose the primary industry context to continue.",
-    gate: () => !!state.industry,
+    title: "Where does this operation belong?",
+    sub: "Choose a broad sector, then narrow it to the specialization that best reflects the operation. The next step will only offer coherent operating archetypes.",
+    hint: "Choose both a sector and a specialization to continue.",
+    gate: () => !!state.industry && !!state.industrySpecialty,
     body: () => {
       const selected = industry();
+      const specialties = selected ? industrySpecialties[selected.id] || [] : [];
       return `
-        ${selected ? `
+        ${state.industrySpecialty ? `
           <div class="industry-synthesis">
             <i data-lucide="${selected.icon}"></i>
-            <div><strong>${escapeHtml(selected.name)}</strong><p>${escapeHtml(selected.focus)}</p></div>
+            <div><small>${escapeHtml(selected.name)}</small><strong>${escapeHtml(state.industrySpecialty)}</strong><p>${escapeHtml(selected.focus)}</p></div>
             <span>${escapeHtml(selected.compliance)}</span>
           </div>` : ""}
-        <div class="industry-grid">
-          ${industries.map((item) => `
-            <button class="industry-card${state.industry === item.id ? " active" : ""}" type="button" data-industry="${item.id}" aria-pressed="${state.industry === item.id}">
-              <i data-lucide="${item.icon}"></i>
-              <span><small>${escapeHtml(item.group)}</small><strong>${escapeHtml(item.name)}</strong><em>${escapeHtml(item.focus)}</em></span>
-            </button>
-          `).join("")}
+        <div class="industry-picker">
+          <div class="sector-list" aria-label="Industry sectors">
+            <span class="picker-label">1 · Sector</span>
+            ${industries.map((item) => `
+              <button class="sector-option${state.industry === item.id ? " active" : ""}" type="button" data-industry="${item.id}" aria-pressed="${state.industry === item.id}">
+                <i data-lucide="${item.icon}"></i><span>${escapeHtml(item.name)}</span><i data-lucide="chevron-right"></i>
+              </button>
+            `).join("")}
+          </div>
+          <div class="specialty-panel">
+            <div class="specialty-head">
+              <div><span class="picker-label">2 · Specialization</span><strong>${selected ? escapeHtml(selected.name) : "Select a sector"}</strong></div>
+              ${selected ? `<label class="specialty-search"><i data-lucide="search"></i><input id="specialtySearch" type="search" placeholder="Search ${escapeHtml(selected.name)}" autocomplete="off" aria-label="Search specializations"></label>` : ""}
+            </div>
+            ${selected ? `<div class="specialty-list" id="specialtyList">
+              ${specialties.map((item, index) => `<button class="specialty-option${state.industrySpecialty === item ? " active" : ""}" type="button" data-specialty-index="${index}" aria-pressed="${state.industrySpecialty === item}"><span>${escapeHtml(item)}</span><i data-lucide="check"></i></button>`).join("")}
+              <p class="specialty-empty" id="specialtyEmpty" hidden>No matching specialization.</p>
+            </div>` : `<div class="specialty-placeholder"><i data-lucide="corner-down-left"></i><p>Pick the closest sector to reveal its focused industry list.</p></div>`}
+          </div>
         </div>
       `;
     },
     attach: (root) => {
       root.querySelectorAll("[data-industry]").forEach((button) => button.addEventListener("click", () => {
+        const changed = state.industry !== button.dataset.industry;
         state.industry = button.dataset.industry;
+        if (changed) state.industrySpecialty = null;
         state.archetypes = state.archetypes.filter((id) => isArchetypeCompatible(id));
         state.erp = mode().erp;
         render();
       }));
+      root.querySelectorAll("[data-specialty-index]").forEach((button) => button.addEventListener("click", () => {
+        state.industrySpecialty = (industrySpecialties[state.industry] || [])[Number(button.dataset.specialtyIndex)];
+        render();
+      }));
+      root.querySelector("#specialtySearch")?.addEventListener("input", (event) => {
+        const query = event.target.value.trim().toLocaleLowerCase();
+        let visible = 0;
+        root.querySelectorAll("[data-specialty-index]").forEach((button) => {
+          const matches = button.textContent.toLocaleLowerCase().includes(query);
+          button.hidden = !matches;
+          if (matches) visible += 1;
+        });
+        const empty = root.querySelector("#specialtyEmpty");
+        if (empty) empty.hidden = visible > 0;
+      });
     },
   },
   {
@@ -460,7 +513,7 @@ const steps = [
     body: () => `
       <div class="derive">
         <div class="derive-chain">
-          <span class="chain-node industry-node">${escapeHtml(industry()?.name || "Industry not set")}</span>
+          <span class="chain-node industry-node">${escapeHtml(industryLabel() || "Industry not set")}</span>
           <i data-lucide="plus"></i>
           <span class="chain-node">${escapeHtml(archetypeSynthesis().count === 1 ? archetypeSynthesis().title : `${archetypeSynthesis().count} reconciled patterns`)}</span>
           <i data-lucide="arrow-right"></i>
@@ -914,7 +967,7 @@ const steps = [
       const r = readiness();
       const rows = [
         ["Planning objective", state.scope ? "done" : "open", state.scope === "aps-ds" ? "Advanced Planning & Detailed Scheduling" : "Not selected"],
-        ["Industry context", state.industry ? "done" : "open", industry()?.name || "Not selected"],
+        ["Industry context", state.industrySpecialty ? "done" : "open", industryLabel() || "Not selected"],
         ["Operating archetypes", state.archetypes?.length ? "done" : "open", state.archetypes?.length ? archetypeSynthesis().title : "Not characterized"],
         ["Department taxonomy", state.departmentTypes?.length ? "done" : "open", state.departmentTypes?.length ? `${state.departmentTypes.length} semantic types selected` : "Not configured"],
         ["Calendars & capacity", state.calendar?.layering ? "done" : "open", state.calendar?.layering ? `${calendarProfile().base} · ${state.calendar.pattern} · ${state.calendar.exceptions}` : "Not characterized"],
@@ -955,7 +1008,7 @@ const steps = [
       return `
         <div class="summary-grid">
           <div class="summary-card"><span>Objective</span><strong>${state.scope === "aps-ds" ? "APS / Detailed Scheduling" : "Pending"}</strong><small>hours-to-weeks planning horizon</small></div>
-          <div class="summary-card"><span>Industry</span><strong>${industry() ? escapeHtml(industry().name) : "Pending"}</strong><small>${industry() ? escapeHtml(industry().compliance) : "context not selected"}</small></div>
+          <div class="summary-card"><span>Industry</span><strong>${industryLabel() ? escapeHtml(industryLabel()) : "Pending"}</strong><small>${industry() ? escapeHtml(industry().name) : "context not selected"}</small></div>
           <div class="summary-card"><span>Representative data</span><strong>${generated.departments.length} departments · ${generated.resources.length} resources</strong><small>synthetic and replaceable</small></div>
           <div class="summary-card"><span>BOM</span><strong>${state.bom?.structure ? escapeHtml(state.bom.structure) : "Pending"}</strong><small>${state.bom?.source ? escapeHtml(state.bom.source) : "integration grain not set"}</small></div>
           <div class="summary-card"><span>Capacity</span><strong>${state.calendar?.layering ? escapeHtml(state.calendar.layering) : "Pending"}</strong><small>${state.calendar?.pattern ? escapeHtml(state.calendar.pattern) : "calendar pattern not set"}</small></div>
@@ -1115,7 +1168,7 @@ function exportBrief() {
   const brief = {
     product: "ImplementationOS for Manufacturing Software",
     planningObjective: planningLevels.find((item) => item.id === state.scope) || null,
-    industry: industry(),
+    industry: industry() ? { ...industry(), specialty: state.industrySpecialty } : null,
     archetypes: selectedArchetypes().map(({ id, name, mode: archetypeMode }) => ({ id, name, mode: archetypeMode })),
     archetypeSynthesis: { ...archetypeSynthesis(), ...modeMix(), dominantLabel: mode().label },
     mode: mode().label,
