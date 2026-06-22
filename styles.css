@@ -5075,6 +5075,107 @@ body.genesis-open {
 }
 .tank-guide-key.heel { border-top-color: var(--muted); }
 
+/* Setup / changeover / cleaning sequence lanes. */
+.seq-gantt {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 14px 0 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  max-width: 760px;
+}
+
+.seq-row {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  align-items: center;
+  gap: 12px;
+}
+
+.seq-label {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.seq-label b {
+  font-size: 0.54rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.seq-track {
+  position: relative;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+  overflow: hidden;
+}
+
+.seq-seg {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-size: 0.58rem;
+  font-weight: 700;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.seq-seg em { font-style: normal; padding: 0 4px; }
+
+.seq-seg.job {
+  background: color-mix(in srgb, var(--teal) 78%, #fff);
+  color: #0c4a44;
+  border: 1px solid color-mix(in srgb, var(--teal) 60%, #000);
+}
+
+.seq-seg.setup { background: var(--violet); color: #fff; }
+.seq-seg.changeover { background: var(--amber); color: #fff; }
+
+.seq-seg.cleaning {
+  background-color: var(--panel);
+  background-image: repeating-linear-gradient(135deg, rgba(102, 112, 132, 0.45) 0, rgba(102, 112, 132, 0.45) 2px, transparent 2px, transparent 6px);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+}
+
+/* A concurrent transition overlaps continuing production: a band on top. */
+.seq-seg.over {
+  top: 2px;
+  bottom: 56%;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.18);
+  z-index: 2;
+}
+
+.seq-swatch {
+  width: 16px;
+  height: 13px;
+  border-radius: 3px;
+  border: 1px solid var(--line-strong);
+}
+
+.seq-swatch.job { background: color-mix(in srgb, var(--teal) 78%, #fff); border-color: var(--teal); }
+.seq-swatch.setup { background: var(--violet); border-color: var(--violet); }
+.seq-swatch.changeover { background: var(--amber); border-color: var(--amber); }
+.seq-swatch.cleaning {
+  background-color: var(--panel);
+  background-image: repeating-linear-gradient(135deg, rgba(102, 112, 132, 0.45) 0, rgba(102, 112, 132, 0.45) 2px, transparent 2px, transparent 6px);
+}
+
 .bom-profile,
 .capacity-profile,
 .execution-profile {
