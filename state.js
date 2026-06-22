@@ -25,6 +25,9 @@ const initialState = {
     modifiersConfirmed: false,
   },
   constraint: null,
+  // Migration sentinel: two purely-visual Gantt steps were added around the
+  // calendar step. Its absence in a saved session triggers the index shift.
+  calendarVisuals: true,
   taxonomyMode: "representative",
   departmentTypes: [],
   resourceTypes: [],
@@ -85,6 +88,15 @@ function load() {
         const vsIdx = steps.findIndex((step) => step.id === "volume-storage");
         if (vsIdx >= 0 && Number(saved.i || 0) >= vsIdx) state.i = Number(saved.i) + 1;
         if (vsIdx >= 0 && Number(saved.max || 0) >= vsIdx) state.max = Number(saved.max) + 1;
+      }
+      if (!("calendarVisuals" in saved)) {
+        // Two visual steps were inserted around the calendar step; shift the
+        // saved position past each one it already sits at or beyond.
+        ["calendar-gantt-intro", "calendar-gantt-preview"].forEach((id) => {
+          const idx = steps.findIndex((step) => step.id === id);
+          if (idx >= 0 && Number(state.i) >= idx) state.i = Number(state.i) + 1;
+          if (idx >= 0 && Number(state.max) >= idx) state.max = Number(state.max) + 1;
+        });
       }
       if (!Array.isArray(saved.archetypes) && saved.archetype) state.archetypes = [saved.archetype];
       if (!("scope" in saved)) {
