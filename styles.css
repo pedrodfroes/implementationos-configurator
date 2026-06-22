@@ -5004,6 +5004,77 @@ body.genesis-open {
 .gantt-swatch.idle { background: var(--panel-2); }
 .gantt-swatch.ccr { background: var(--amber); border-color: var(--amber); }
 
+/* Tank level charts — fill level over time, drawn as SVG. */
+.tank-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  max-width: 760px;
+  margin: 12px 0 4px;
+}
+
+.tank-chart {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel);
+  padding: 8px 10px 6px;
+}
+
+.tank-name {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin-bottom: 4px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.tank-name b {
+  font-size: 0.55rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.tank-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: var(--panel-2);
+  border-radius: 6px;
+}
+
+.tank-svg line { vector-effect: non-scaling-stroke; }
+
+.tank-fill { stroke: none; }
+.tank-fill.mat-a { fill: color-mix(in srgb, var(--teal) 42%, #fff); }
+.tank-fill.mat-b { fill: color-mix(in srgb, var(--violet) 38%, #fff); }
+
+.tank-clean {
+  fill: color-mix(in srgb, var(--amber) 24%, #fff);
+  stroke: color-mix(in srgb, var(--amber) 55%, transparent);
+  stroke-width: 1;
+}
+
+.tank-guide { fill: none; stroke-width: 1; stroke-dasharray: 3 3; }
+.tank-guide.max { stroke: var(--amber); }
+.tank-guide.heel { stroke: var(--muted); }
+.tank-axis { stroke: var(--line-strong); stroke-width: 1; }
+
+.gantt-swatch.mat-a { background: color-mix(in srgb, var(--teal) 42%, #fff); border-color: var(--teal); }
+.gantt-swatch.mat-b { background: color-mix(in srgb, var(--violet) 38%, #fff); border-color: var(--violet); }
+.gantt-swatch.clean { background: color-mix(in srgb, var(--amber) 24%, #fff); border-color: var(--amber); }
+
+.tank-guide-key {
+  width: 16px;
+  height: 0;
+  border-top: 2px dashed var(--amber);
+  align-self: center;
+}
+.tank-guide-key.heel { border-top-color: var(--muted); }
+
 .bom-profile,
 .capacity-profile,
 .execution-profile {

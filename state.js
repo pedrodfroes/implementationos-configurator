@@ -30,6 +30,7 @@ const initialState = {
   // triggers the matching index shift.
   calendarVisuals: true,
   bottleneckVisuals: true,
+  tankVisuals: true,
   taxonomyMode: "representative",
   departmentTypes: [],
   resourceTypes: [],
@@ -102,6 +103,13 @@ function load() {
       }
       if (!("bottleneckVisuals" in saved)) {
         ["bottleneck-intro", "bottleneck-preview"].forEach((id) => {
+          const idx = steps.findIndex((step) => step.id === id);
+          if (idx >= 0 && Number(state.i) >= idx) state.i = Number(state.i) + 1;
+          if (idx >= 0 && Number(state.max) >= idx) state.max = Number(state.max) + 1;
+        });
+      }
+      if (!("tankVisuals" in saved)) {
+        ["tank-intro", "tank-preview"].forEach((id) => {
           const idx = steps.findIndex((step) => step.id === id);
           if (idx >= 0 && Number(state.i) >= idx) state.i = Number(state.i) + 1;
           if (idx >= 0 && Number(state.max) >= idx) state.max = Number(state.max) + 1;

@@ -188,6 +188,130 @@ function bottleneckPreviewCaption() {
   }[state.constraint] || "Bottleneck hypothesis not set.";
 }
 
+// ── Tank level chart ─────────────────────────────────────────────────
+// Volume storage is hard to read as bars, so a tank is drawn as fill level
+// over time: an SVG area that rises on inflow, holds, and falls on outflow.
+// Materials are colored, cleaning (CIP) is a low band, and the max-capacity
+// and minimum-heel limits are dashed guides.
+const TANK_W = 300, TANK_H = 82, TANK_PADX = 6, TANK_PADTOP = 8, TANK_PADBOT = 12;
+function tankX(t) { return TANK_PADX + (t / 100) * (TANK_W - 2 * TANK_PADX); }
+function tankY(level) { return TANK_PADTOP + (1 - level / 100) * (TANK_H - TANK_PADTOP - TANK_PADBOT); }
+function tankLevelSvg(tank) {
+  const base = tankY(0);
+  const heel = tank.heel != null ? tank.heel : 12;
+  const cap = tank.capacity != null ? tank.capacity : 92;
+  const shapes = (tank.phases || []).map((ph) => {
+    const x0 = tankX(ph.from), x1 = tankX(ph.to);
+    if (ph.type === "clean") {
+      return `<rect class="tank-clean" x="${x0.toFixed(1)}" y="${tankY(heel).toFixed(1)}" width="${(x1 - x0).toFixed(1)}" height="${(base - tankY(heel)).toFixed(1)}"></rect>`;
+    }
+    const startL = Array.isArray(ph.level) ? ph.level[0] : ph.level;
+    const endL = Array.isArray(ph.level) ? ph.level[1] : ph.level;
+    const mat = ph.material === "B" ? "b" : "a";
+    return `<polygon class="tank-fill mat-${mat}" points="${x0.toFixed(1)},${base.toFixed(1)} ${x0.toFixed(1)},${tankY(startL).toFixed(1)} ${x1.toFixed(1)},${tankY(endL).toFixed(1)} ${x1.toFixed(1)},${base.toFixed(1)}"></polygon>`;
+  }).join("");
+  const guides = `
+    <line class="tank-guide max" x1="${TANK_PADX}" y1="${tankY(cap).toFixed(1)}" x2="${TANK_W - TANK_PADX}" y2="${tankY(cap).toFixed(1)}"></line>
+    <line class="tank-guide heel" x1="${TANK_PADX}" y1="${tankY(heel).toFixed(1)}" x2="${TANK_W - TANK_PADX}" y2="${tankY(heel).toFixed(1)}"></line>`;
+  return `
+    <div class="tank-chart">
+      <span class="tank-name">${escapeHtml(tank.label)}${tank.note ? `<b>${escapeHtml(tank.note)}</b>` : ""}</span>
+      <svg viewBox="0 0 ${TANK_W} ${TANK_H}" class="tank-svg" role="img" aria-label="${escapeHtml(tank.label)} fill level over time">
+        ${shapes}
+        ${guides}
+        <line class="tank-axis" x1="${TANK_PADX}" y1="${base.toFixed(1)}" x2="${TANK_W - TANK_PADX}" y2="${base.toFixed(1)}"></line>
+      </svg>
+    </div>`;
+}
+function tankBoardMarkup(tanks) {
+  return `
+    <div class="tank-board">${tanks.map(tankLevelSvg).join("")}</div>
+    <div class="gantt-legend tank-legend">
+      <span><i class="gantt-swatch mat-a"></i>Material A</span>
+      <span><i class="gantt-swatch mat-b"></i>Material B (after cleaning)</span>
+      <span><i class="gantt-swatch clean"></i>Cleaning / CIP</span>
+      <span><i class="tank-guide-key max"></i>Max capacity</span>
+      <span><i class="tank-guide-key heel"></i>Min heel</span>
+    </div>`;
+}
+
+// Fixed teaching example: four tanks, four behaviors.
+const tankIntroTanks = [
+  { label: "T1", note: "fill · hold · drain", capacity: 92, heel: 12, phases: [
+    { type: "fill", from: 0, to: 24, level: [0, 86] },
+    { type: "hold", from: 24, to: 50, level: 86 },
+    { type: "drain", from: 50, to: 74, level: [86, 12] },
+    { type: "hold", from: 74, to: 100, level: 12 },
+  ] },
+  { label: "T2", note: "buffer · many in/out", capacity: 92, heel: 18, phases: [
+    { type: "fill", from: 0, to: 14, level: [30, 70] },
+    { type: "drain", from: 14, to: 30, level: [70, 32] },
+    { type: "fill", from: 30, to: 46, level: [32, 76] },
+    { type: "drain", from: 46, to: 62, level: [76, 28] },
+    { type: "fill", from: 62, to: 80, level: [28, 68] },
+    { type: "drain", from: 80, to: 100, level: [68, 34] },
+  ] },
+  { label: "T3", note: "single-material + CIP", capacity: 92, heel: 12, phases: [
+    { type: "fill", from: 0, to: 20, level: [0, 80], material: "A" },
+    { type: "hold", from: 20, to: 34, level: 80, material: "A" },
+    { type: "drain", from: 34, to: 50, level: [80, 0], material: "A" },
+    { type: "clean", from: 50, to: 62 },
+    { type: "fill", from: 62, to: 80, level: [0, 84], material: "B" },
+    { type: "hold", from: 80, to: 100, level: 84, material: "B" },
+  ] },
+  { label: "T4", note: "maturation hold", capacity: 92, heel: 12, phases: [
+    { type: "fill", from: 0, to: 18, level: [0, 78] },
+    { type: "hold", from: 18, to: 82, level: 78 },
+    { type: "drain", from: 82, to: 100, level: [78, 12] },
+  ] },
+];
+
+// Assemble a representative tank cycle from the selected behaviors.
+function tankCycle(label, { cleaning, matures }) {
+  const holdEnd = matures ? 58 : 40;
+  const phases = [
+    { type: "fill", from: 0, to: 18, level: [0, 82], material: "A" },
+    { type: "hold", from: 18, to: holdEnd, level: 82, material: "A" },
+  ];
+  if (cleaning) {
+    phases.push({ type: "drain", from: holdEnd, to: holdEnd + 14, level: [82, 0], material: "A" });
+    phases.push({ type: "clean", from: holdEnd + 14, to: holdEnd + 24 });
+    phases.push({ type: "fill", from: holdEnd + 24, to: 92, level: [0, 80], material: "B" });
+    phases.push({ type: "hold", from: 92, to: 100, level: 80, material: "B" });
+  } else {
+    phases.push({ type: "drain", from: holdEnd, to: holdEnd + 20, level: [82, 12], material: "A" });
+    phases.push({ type: "hold", from: holdEnd + 20, to: 100, level: 12, material: "A" });
+  }
+  return { label, note: matures ? "state change" : "batch cycle", capacity: 90, heel: 12, phases };
+}
+function tankPreviewTanks() {
+  const v = state.volumeStorage || {};
+  const has = (id) => (v.behaviors || []).includes(id);
+  const cleaning = has("attribute-cleaning") || has("single-material");
+  const matures = has("state-change");
+  if (has("buffer")) {
+    return [
+      { label: "T1", note: "buffer behavior", capacity: 90, heel: 20, phases: [
+        { type: "fill", from: 0, to: 14, level: [30, 72] }, { type: "drain", from: 14, to: 30, level: [72, 34] },
+        { type: "fill", from: 30, to: 46, level: [34, 78] }, { type: "drain", from: 46, to: 62, level: [78, 30] },
+        { type: "fill", from: 62, to: 80, level: [30, 70] }, { type: "drain", from: 80, to: 100, level: [70, 36] },
+      ] },
+      tankCycle("T2", { cleaning, matures }),
+    ];
+  }
+  return [tankCycle("T1", { cleaning, matures })];
+}
+function tankPreviewCaption() {
+  const v = state.volumeStorage || {};
+  const n = (v.behaviors || []).length;
+  const named = [];
+  if ((v.behaviors || []).includes("buffer")) named.push("buffer");
+  if ((v.behaviors || []).includes("single-material") || (v.behaviors || []).includes("attribute-cleaning")) named.push("single-material + cleaning");
+  if ((v.behaviors || []).includes("state-change")) named.push("state change");
+  if ((v.behaviors || []).includes("size-batch")) named.push("dynamic batch size");
+  return `${n} of ${volumeStorageBehaviors.length} tank behaviors${named.length ? " · " + named.join(" · ") : ""}`;
+}
+
 const steps = [
   {
     id: "welcome", phase: "Start", nav: "Welcome", cta: "Begin setup",
@@ -604,6 +728,17 @@ const steps = [
     },
   },
   {
+    id: "tank-intro", phase: "Model", nav: "Tank basics",
+    title: "A tank's usable capacity changes by the hour.",
+    sub: "Tanks, silos, vats, and buffers are not shelves — their available space rises and falls as material flows in and out. The schedule is feasible only when every feed and draw is coupled to the live level.",
+    hint: "An illustration only. The next screen captures which of these tank behaviors are in scope.",
+    body: () => `
+      <p class="gantt-caption"><i data-lucide="info"></i> Each chart is one tank's fill level over time — rising on inflow, holding, falling on outflow. Dashed lines are the max capacity and minimum heel.</p>
+      ${tankBoardMarkup(tankIntroTanks)}
+      <p class="representative-note"><i data-lucide="info"></i> A tank holds one material until it is empty and cleaned (T3), buffers protect flow with many small in/out moves (T2), and maturation holds the level for a fixed time (T4). The next question captures which of these your plant needs.</p>
+    `,
+  },
+  {
     id: "volume-storage", phase: "Model", nav: "Volume storage",
     title: "Do tanks or other volume assets shape feasibility?",
     sub: "Model tanks, silos, vats, drums, bins, and connected buffers as schedule-dependent volume resources - not as warehouses or ordinary machines.",
@@ -650,6 +785,23 @@ const steps = [
         state.volumeStorage.confirmed = true;
         render();
       });
+    },
+  },
+  {
+    id: "tank-preview", phase: "Model", nav: "Tank preview",
+    title: "What your tank model looks like over a cycle.",
+    sub: "The behaviors you selected, drawn as tank levels over time. Representative tanks will carry this profile until real recipes and capacities replace it.",
+    hint: "Review the projected tank behavior, then continue.",
+    body: () => {
+      const v = state.volumeStorage || {};
+      if (v.present === false) {
+        return `<p class="representative-note"><i data-lucide="circle-slash-2"></i> Volume storage is not in scope for this project — materials use ordinary inventory locations, so no tank scheduling is modeled.</p>`;
+      }
+      return `
+        <div class="gantt-summary"><span>Tank model</span><strong>${escapeHtml(tankPreviewCaption())}</strong></div>
+        ${tankBoardMarkup(tankPreviewTanks())}
+        <p class="gantt-caption"><i data-lucide="info"></i> Illustrative levels over one cycle. APS couples every inflow and outflow to live occupancy, capacity, topology, and product state — never to fixed durations.</p>
+      `;
     },
   },
   ...attributeConcepts.map(makeAttributeStep),
