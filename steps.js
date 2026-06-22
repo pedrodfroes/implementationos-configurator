@@ -312,6 +312,110 @@ function tankPreviewCaption() {
   return `${n} of ${volumeStorageBehaviors.length} tank behaviors${named.length ? " · " + named.join(" · ") : ""}`;
 }
 
+// ── Setup / changeover / cleaning sequence ───────────────────────────
+// A resource's timeline of production runs interleaved with the time lost
+// to setups, changeovers, and cleaning. Sequence-dependent transitions
+// vary in width; a concurrent transition is an `over` band that overlaps
+// continuing production instead of stopping it.
+function seqLaneMarkup(lane) {
+  const blocks = (lane.blocks || []).map((b) => {
+    return `<span class="seq-seg ${b.kind}${b.over ? " over" : ""}" style="left:${b.start}%;width:${(b.end - b.start)}%">${b.label ? `<em>${escapeHtml(b.label)}</em>` : ""}</span>`;
+  }).join("");
+  return `<div class="seq-row"><span class="seq-label">${escapeHtml(lane.label)}${lane.note ? `<b>${escapeHtml(lane.note)}</b>` : ""}</span><div class="seq-track">${blocks}</div></div>`;
+}
+function seqGanttMarkup(lanes, kinds) {
+  const names = { job: "Production run", setup: "Setup", changeover: "Changeover", cleaning: "Cleaning / CIP" };
+  const legend = (kinds || ["job", "setup", "changeover", "cleaning"]).map((k) => `<span><i class="seq-swatch ${k}"></i>${names[k]}</span>`).join("");
+  return `
+    <div class="seq-gantt" role="img" aria-label="Production sequence with setups, changeovers, and cleaning">
+      ${lanes.map(seqLaneMarkup).join("")}
+    </div>
+    <div class="gantt-legend">${legend}</div>`;
+}
+
+// Fixed teaching example: one idea per lane.
+const transitionIntroLanes = [
+  { label: "R1", note: "sequence-dependent", blocks: [
+    { kind: "job", start: 0, end: 24, label: "Run A" },
+    { kind: "changeover", start: 24, end: 30, label: "A→B" },
+    { kind: "job", start: 30, end: 54, label: "Run B" },
+    { kind: "changeover", start: 54, end: 68, label: "B→C" },
+    { kind: "job", start: 68, end: 100, label: "Run C" },
+  ] },
+  { label: "R2", note: "periodic clean", blocks: [
+    { kind: "job", start: 0, end: 28, label: "Run" },
+    { kind: "job", start: 28, end: 56, label: "Run" },
+    { kind: "cleaning", start: 56, end: 70, label: "CIP" },
+    { kind: "job", start: 70, end: 100, label: "Run" },
+  ] },
+  { label: "R3", note: "non-concurrent setup", blocks: [
+    { kind: "job", start: 0, end: 40, label: "Run" },
+    { kind: "setup", start: 40, end: 52, label: "Setup" },
+    { kind: "job", start: 52, end: 100, label: "Run" },
+  ] },
+  { label: "R4", note: "concurrent prep", blocks: [
+    { kind: "job", start: 0, end: 100, label: "Continuous production" },
+    { kind: "setup", start: 34, end: 48, label: "prep", over: true },
+  ] },
+];
+
+// Build one resource lane from the chosen transition model.
+function transitionPreviewLane() {
+  const t = state.transitions || {};
+  const types = t.types || [];
+  const has = (k) => types.includes(k);
+  const seqDep = (t.triggers || []).includes("sequence");
+  const conc = t.concurrency || "non-concurrent";
+  const blocks = [];
+
+  if (conc === "concurrent") {
+    blocks.push({ kind: "job", start: 0, end: 100, label: "Continuous production" });
+    const overs = [];
+    if (has("setup")) overs.push({ kind: "setup", label: "prep" });
+    if (has("changeover")) overs.push({ kind: "changeover", label: seqDep ? "A→B" : "C/O" });
+    if (has("cleaning")) overs.push({ kind: "cleaning", label: "CIP" });
+    const spread = [22, 50, 76];
+    overs.forEach((o, i) => { const c = spread[i % spread.length]; blocks.push({ ...o, start: c - 6, end: c + 6, over: true }); });
+    return [{ label: "R1", note: "transitions overlap production", blocks }];
+  }
+
+  // Sequential layout for non-concurrent and mixed; in mixed, setup and
+  // changeover overlap while cleaning still stops the line.
+  const overlap = (kind) => conc === "mixed" && kind !== "cleaning";
+  const items = [{ kind: "job", dur: 3, label: "P1" }];
+  if (has("changeover")) items.push({ kind: "changeover", dur: seqDep ? 0.9 : 1.4, label: seqDep ? "A→B" : "C/O", over: overlap("changeover") });
+  items.push({ kind: "job", dur: 3, label: "P2" });
+  if (has("cleaning")) items.push({ kind: "cleaning", dur: 1.8, label: "CIP" });
+  items.push({ kind: "job", dur: 3, label: "P3" });
+  if (has("setup")) items.push({ kind: "setup", dur: seqDep ? 1.6 : 1.2, label: "Setup", over: overlap("setup") });
+  items.push({ kind: "job", dur: 3, label: "P4" });
+
+  const total = items.filter((it) => !it.over).reduce((s, it) => s + it.dur, 0);
+  const scale = 100 / total;
+  let cursor = 0;
+  const overlays = [];
+  items.forEach((it) => {
+    if (it.over) { overlays.push({ it, at: cursor }); return; }
+    const start = cursor, end = cursor + it.dur * scale;
+    blocks.push({ kind: it.kind, label: it.label, start, end });
+    cursor = end;
+  });
+  overlays.forEach(({ it, at }) => {
+    const w = it.dur * scale;
+    const start = Math.max(0, Math.min(100 - w, at - w / 2));
+    blocks.push({ kind: it.kind, label: it.label, start, end: start + w, over: true });
+  });
+  return [{ label: "R1", note: conc === "mixed" ? "some overlap, some block" : "transitions block the line", blocks }];
+}
+
+function transitionPreviewCaption() {
+  const t = state.transitions || {};
+  const typeNames = transitionTypes.filter((x) => (t.types || []).includes(x.id)).map((x) => x.name);
+  const conc = transitionConcurrency.find((x) => x.id === t.concurrency)?.name || "concurrency not set";
+  const triggers = transitionTriggers.filter((x) => (t.triggers || []).includes(x.id)).map((x) => x.name.toLowerCase());
+  return `${typeNames.join(" · ") || "Transitions"} · ${conc}${triggers.length ? " · " + triggers.join(", ") : ""}`;
+}
+
 const steps = [
   {
     id: "welcome", phase: "Start", nav: "Welcome", cta: "Begin setup",
@@ -806,6 +910,17 @@ const steps = [
   },
   ...attributeConcepts.map(makeAttributeStep),
   {
+    id: "transition-intro", phase: "Model", nav: "Transition basics",
+    title: "Between runs, the line loses time it never gets back.",
+    sub: () => `Setups, changeovers, and cleaning sit between production runs and consume real capacity. APS must know what inserts them, how long they take, and whether they stop the ${profile().resource.toLowerCase()} or can overlap it.`,
+    hint: "An illustration only. The next screen captures how your transitions actually behave.",
+    body: () => `
+      <p class="gantt-caption"><i data-lucide="info"></i> Each lane is one resource's run sequence. Coloured gaps are time lost to transitions — the wider the gap, the more capacity it costs.</p>
+      ${seqGanttMarkup(transitionIntroLanes)}
+      <p class="representative-note"><i data-lucide="info"></i> Changeovers can be sequence-dependent — A→B is quick, B→C is long (R1). Cleaning recurs after runs (R2). A non-concurrent setup stops the line (R3), while a concurrent one is prepared offline and overlaps production (R4).</p>
+    `,
+  },
+  {
     id: "transitions", phase: "Model", nav: "Setup & cleaning",
     title: "How do setups, changeovers, and cleaning behave?",
     sub: () => `Between runs the line loses time to setups, changeovers, and cleans. APS must know what inserts them, whether they block the ${profile().resource.toLowerCase()}, and what they are keyed to — your ${itemTerm()} attributes or SKU codes.`,
@@ -886,6 +1001,17 @@ const steps = [
         render();
       }));
     },
+  },
+  {
+    id: "transition-preview", phase: "Model", nav: "Transition preview",
+    title: "What your transitions cost on the schedule.",
+    sub: "Your transition model drawn on one resource's run sequence. Representative runs will carry this behavior until real changeover and cleaning rules replace it.",
+    hint: "Review the projected lost time, then continue.",
+    body: () => `
+      <div class="gantt-summary"><span>Transition model</span><strong>${escapeHtml(transitionPreviewCaption())}</strong></div>
+      ${seqGanttMarkup(transitionPreviewLane(), ["job", ...transitionTypes.filter((x) => (state.transitions?.types || []).includes(x.id)).map((x) => x.id)])}
+      <p class="gantt-caption"><i data-lucide="info"></i> Illustrative sequence. APS inserts each transition from your trigger and driver rules, and only counts it against capacity when it actually blocks the resource.</p>
+    `,
   },
   {
     id: "bom", phase: "Model", nav: "BOM profile",
