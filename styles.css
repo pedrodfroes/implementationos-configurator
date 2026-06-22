@@ -4960,6 +4960,50 @@ body.genesis-open {
 
 .gantt-summary strong { font-size: 0.92rem; color: var(--ink); }
 
+/* Load variant: track shows idle slack (no hatch); blocks are committed
+   jobs; the bottleneck row or blocks are amber. */
+.gantt-load .gantt-track {
+  background-image: none;
+  background: var(--panel-2);
+}
+
+.gantt-block.job {
+  background: color-mix(in srgb, var(--teal) 78%, #fff);
+  border: 1px solid color-mix(in srgb, var(--teal) 80%, #000);
+  border-radius: 3px;
+}
+
+.gantt-block.job.ccr {
+  background: var(--amber);
+  border-color: color-mix(in srgb, var(--amber) 70%, #000);
+}
+
+.gantt-row.ccr .gantt-track {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 1px var(--amber);
+  background: color-mix(in srgb, var(--amber-soft) 55%, var(--panel-2));
+}
+
+.gantt-row.ccr .gantt-block.job {
+  background: var(--amber);
+  border-color: color-mix(in srgb, var(--amber) 70%, #000);
+}
+
+.gantt-row.ccr .gantt-label b { color: var(--amber); font-weight: 800; }
+
+.gantt-divider {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 0;
+  border-left: 1.5px dashed var(--line-strong);
+  z-index: 2;
+}
+
+.gantt-swatch.job { background: color-mix(in srgb, var(--teal) 78%, #fff); border-color: var(--teal); }
+.gantt-swatch.idle { background: var(--panel-2); }
+.gantt-swatch.ccr { background: var(--amber); border-color: var(--amber); }
+
 .bom-profile,
 .capacity-profile,
 .execution-profile {
