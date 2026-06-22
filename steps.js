@@ -98,6 +98,96 @@ function calendarPreviewCaption() {
   return `${pattern} · ${exc}${mods.length ? " · " + mods.join(" · ") : ""}`;
 }
 
+// ── Bottleneck / CCR load Gantt ──────────────────────────────────────
+// Same R1–R4 timeline, but blocks are committed jobs and the track shows
+// idle slack instead of blocked time. The capacity-constrained resource
+// (CCR) runs closest to full; a row marked `ccr` (or individual `ccr`
+// blocks, for a shifting bottleneck) is highlighted amber.
+function loadGanttMarkup(rows, opts = {}) {
+  const ticks = ganttTicks.map((h) => `<span style="left:${ganttHourPct(h)}%">${String(h).padStart(2, "0")}</span>`).join("");
+  const divider = opts.divider != null ? `<span class="gantt-divider" style="left:${ganttHourPct(opts.divider)}%"></span>` : "";
+  const body = rows.map((row) => {
+    const blocks = (row.blocks || []).map((b) => {
+      const left = ganttHourPct(b.start);
+      const width = ganttHourPct(b.end) - left;
+      return `<span class="gantt-block job${b.ccr ? " ccr" : ""}" style="left:${left}%;width:${width}%"></span>`;
+    }).join("");
+    return `<div class="gantt-row${row.ccr ? " ccr" : ""}"><span class="gantt-label">${escapeHtml(row.label)}${row.badge ? `<b>${escapeHtml(row.badge)}</b>` : ""}</span><div class="gantt-track">${divider}${blocks}</div></div>`;
+  }).join("");
+  return `
+    <div class="gantt gantt-load" role="img" aria-label="Resource load timeline highlighting the bottleneck">
+      <div class="gantt-row gantt-axis"><span class="gantt-label"></span><div class="gantt-ticks">${ticks}</div></div>
+      ${body}
+    </div>
+    <div class="gantt-legend">
+      <span><i class="gantt-swatch job"></i>Committed work</span>
+      <span><i class="gantt-swatch idle"></i>Idle — slack capacity</span>
+      <span><i class="gantt-swatch ccr"></i>Bottleneck — capacity-constrained resource</span>
+    </div>`;
+}
+
+const jobsMedium = [{ start: 1, end: 6 }, { start: 8, end: 13 }, { start: 15, end: 20 }];
+const jobsLight = [{ start: 2, end: 6 }, { start: 16, end: 20 }];
+const jobsFull = [{ start: 0, end: 7 }, { start: 7, end: 13 }, { start: 13, end: 19 }, { start: 19, end: 24 }];
+
+// Fixed teaching example: R2 is the clear CCR.
+const bottleneckIntroRows = [
+  { label: "R1", badge: "58%", blocks: jobsMedium },
+  { label: "R2", badge: "CCR · 96%", ccr: true, blocks: jobsFull },
+  { label: "R3", badge: "74%", blocks: [{ start: 0, end: 5 }, { start: 6, end: 11 }, { start: 13, end: 18 }, { start: 20, end: 24 }] },
+  { label: "R4", badge: "34%", blocks: jobsLight },
+];
+
+// Draw the chosen bottleneck hypothesis on the R1–R4 load timeline.
+function bottleneckPreviewSpec() {
+  const base = () => ([
+    { label: "R1", badge: "61%", blocks: jobsMedium },
+    { label: "R2", badge: "57%", blocks: [{ start: 0, end: 4 }, { start: 7, end: 12 }, { start: 16, end: 21 }] },
+    { label: "R3", badge: "64%", blocks: [{ start: 1, end: 6 }, { start: 8, end: 13 }, { start: 17, end: 22 }] },
+    { label: "R4", badge: "48%", blocks: jobsLight },
+  ]);
+  switch (state.constraint) {
+    case "shifting":
+      return {
+        divider: 12,
+        rows: [
+          { label: "R1", badge: "60%", blocks: [{ start: 1, end: 6 }, { start: 14, end: 19 }] },
+          { label: "R2", badge: "CCR → slack", blocks: [{ start: 0, end: 4, ccr: true }, { start: 4, end: 8, ccr: true }, { start: 8, end: 12, ccr: true }, { start: 15, end: 19 }] },
+          { label: "R3", badge: "63%", blocks: [{ start: 2, end: 7 }, { start: 13, end: 18 }] },
+          { label: "R4", badge: "slack → CCR", blocks: [{ start: 3, end: 7 }, { start: 12, end: 16, ccr: true }, { start: 16, end: 20, ccr: true }, { start: 20, end: 24, ccr: true }] },
+        ],
+      };
+    case "equipment-family": {
+      const rows = base();
+      rows[1] = { label: "R2", badge: "equipment CCR · 95%", ccr: true, blocks: jobsFull };
+      rows[3] = { label: "R4", badge: "31%", blocks: jobsLight };
+      return { rows };
+    }
+    case "shared-stage": {
+      const rows = base();
+      rows[2] = { label: "R3", badge: "shared stage · 94%", ccr: true, blocks: jobsFull };
+      return { rows };
+    }
+    case "quality-release": {
+      const rows = base();
+      rows[3] = { label: "R4", badge: "QA release · 93%", ccr: true, blocks: jobsFull };
+      return { rows };
+    }
+    default: // unknown — no resource clearly dominates
+      return { rows: base() };
+  }
+}
+
+function bottleneckPreviewCaption() {
+  return {
+    unknown: "No clear CCR yet — every resource carries similar load. Data profiling and scenario runs will reveal the binding one.",
+    shifting: "The bottleneck shifts across the horizon — R2 binds early, R4 binds later. APS must re-find it each run, not assume a fixed CCR.",
+    "equipment-family": "An equipment family is the CCR — it runs near full while others hold slack. Representative resources will carry this pattern.",
+    "shared-stage": "A shared processing stage is the CCR — merged demand from several flows saturates it.",
+    "quality-release": "Quality release gates throughput — inspection and release capacity, not a machine, is the CCR.",
+  }[state.constraint] || "Bottleneck hypothesis not set.";
+}
+
 const steps = [
   {
     id: "welcome", phase: "Start", nav: "Welcome", cta: "Begin setup",
@@ -420,21 +510,46 @@ const steps = [
     `,
   },
   {
-    id: "constraint", phase: () => organizationTerm(), nav: "Constraint view",
-    title: "What is currently known about the constraint?",
-    sub: "Capture the customer's view as a hypothesis, not as planning truth. The limiting constraint may be unknown or shift by horizon, product mix, campaign, and scenario.",
+    id: "bottleneck-intro", phase: () => organizationTerm(), nav: "Bottleneck basics",
+    title: "The bottleneck is the resource everything waits on.",
+    sub: "One resource usually runs closest to full — the capacity-constrained resource (CCR). Its pace sets the plant's output; the others carry slack. Find it before optimizing anything else.",
+    hint: "An illustration only. The next screen captures what the customer believes about their bottleneck.",
+    body: () => `
+      <p class="gantt-caption"><i data-lucide="info"></i> One working day of committed jobs. The fuller the row, the less slack — the resource with almost none is the bottleneck.</p>
+      ${loadGanttMarkup(bottleneckIntroRows)}
+      <p class="representative-note"><i data-lucide="info"></i> R2 is the CCR: it gates throughput, so lifting any other resource changes nothing. Bottlenecks also <strong>shift</strong> with product mix, campaigns, and horizon — the next question captures whether the customer sees a stable or a shifting bottleneck.</p>
+    `,
+  },
+  {
+    id: "constraint", phase: () => organizationTerm(), nav: "Bottleneck",
+    title: "Where is the bottleneck — the capacity-constrained resource?",
+    sub: "Capture the customer's view as a hypothesis, not as planning truth. The bottleneck (CCR) may be unknown, or it may shift by horizon, product mix, campaign, and scenario.",
     hint: "Choose the best current description. It can be refined when data and scenarios reveal more.",
     gate: () => !!state.constraint,
     body: () => `
       <div class="choice-grid three">
-        ${choiceTile("unknown", state.constraint === "unknown", "circle-help", "Not known yet", "Let data profiling and scenario runs surface likely constraints")}
-        ${choiceTile("shifting", state.constraint === "shifting", "shuffle", "Shifting constraint", "Changes with horizon, product mix, campaign, or operating conditions")}
-        ${choiceTile("equipment-family", state.constraint === "equipment-family", "cog", "Equipment family", "Customer-observed capacity pattern; representative resources will illustrate it")}
+        ${choiceTile("unknown", state.constraint === "unknown", "circle-help", "Not known yet", "Let data profiling and scenario runs surface the likely bottleneck")}
+        ${choiceTile("shifting", state.constraint === "shifting", "shuffle", "Shifting bottleneck", "Moves with horizon, product mix, campaign, or operating conditions")}
+        ${choiceTile("equipment-family", state.constraint === "equipment-family", "cog", "Equipment-family CCR", "Customer-observed capacity-constrained resource; representative resources will illustrate it")}
         ${choiceTile("shared-stage", state.constraint === "shared-stage", "workflow", "Shared processing stage", "A shared stage may constrain multiple products or campaigns")}
         ${choiceTile("quality-release", state.constraint === "quality-release", "microscope", "Quality release", "Inspection, testing, or release capacity may gate the schedule")}
       </div>
     `,
     attach: (root) => bindChoices(root, (v) => { state.constraint = v; render(); }),
+  },
+  {
+    id: "bottleneck-preview", phase: () => organizationTerm(), nav: "Bottleneck preview",
+    title: "What that bottleneck looks like on the schedule.",
+    sub: "Your hypothesis, drawn on the same R1–R4 load timeline. Representative resources will carry this pattern until real data refines it.",
+    hint: "Review the projected load, then continue.",
+    body: () => {
+      const spec = bottleneckPreviewSpec();
+      return `
+        <div class="gantt-summary"><span>Bottleneck hypothesis</span><strong>${escapeHtml(bottleneckPreviewCaption())}</strong></div>
+        ${loadGanttMarkup(spec.rows, { divider: spec.divider })}
+        <p class="gantt-caption"><i data-lucide="info"></i> Illustrative single day. APS recomputes the binding resource every run — the CCR shown here is the customer's hypothesis, not a fixed assumption.</p>
+      `;
+    },
   },
   {
     id: "areas", phase: "Model", nav: "Department taxonomy",

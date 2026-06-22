@@ -25,9 +25,11 @@ const initialState = {
     modifiersConfirmed: false,
   },
   constraint: null,
-  // Migration sentinel: two purely-visual Gantt steps were added around the
-  // calendar step. Its absence in a saved session triggers the index shift.
+  // Migration sentinels: purely-visual Gantt steps were added around the
+  // calendar and bottleneck steps. Each flag's absence in a saved session
+  // triggers the matching index shift.
   calendarVisuals: true,
+  bottleneckVisuals: true,
   taxonomyMode: "representative",
   departmentTypes: [],
   resourceTypes: [],
@@ -93,6 +95,13 @@ function load() {
         // Two visual steps were inserted around the calendar step; shift the
         // saved position past each one it already sits at or beyond.
         ["calendar-gantt-intro", "calendar-gantt-preview"].forEach((id) => {
+          const idx = steps.findIndex((step) => step.id === id);
+          if (idx >= 0 && Number(state.i) >= idx) state.i = Number(state.i) + 1;
+          if (idx >= 0 && Number(state.max) >= idx) state.max = Number(state.max) + 1;
+        });
+      }
+      if (!("bottleneckVisuals" in saved)) {
+        ["bottleneck-intro", "bottleneck-preview"].forEach((id) => {
           const idx = steps.findIndex((step) => step.id === id);
           if (idx >= 0 && Number(state.i) >= idx) state.i = Number(state.i) + 1;
           if (idx >= 0 && Number(state.max) >= idx) state.max = Number(state.max) + 1;
