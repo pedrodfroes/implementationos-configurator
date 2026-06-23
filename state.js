@@ -32,6 +32,7 @@ const initialState = {
   bottleneckVisuals: true,
   tankVisuals: true,
   transitionVisuals: true,
+  workforceVisuals: true,
   taxonomyMode: "representative",
   departmentTypes: [],
   resourceTypes: [],
@@ -118,6 +119,13 @@ function load() {
       }
       if (!("transitionVisuals" in saved)) {
         ["transition-intro", "transition-preview"].forEach((id) => {
+          const idx = steps.findIndex((step) => step.id === id);
+          if (idx >= 0 && Number(state.i) >= idx) state.i = Number(state.i) + 1;
+          if (idx >= 0 && Number(state.max) >= idx) state.max = Number(state.max) + 1;
+        });
+      }
+      if (!("workforceVisuals" in saved)) {
+        ["workforce-intro", "workforce-preview"].forEach((id) => {
           const idx = steps.findIndex((step) => step.id === id);
           if (idx >= 0 && Number(state.i) >= idx) state.i = Number(state.i) + 1;
           if (idx >= 0 && Number(state.max) >= idx) state.max = Number(state.max) + 1;

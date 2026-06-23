@@ -416,6 +416,95 @@ function transitionPreviewCaption() {
   return `${typeNames.join(" · ") || "Transitions"} · ${conc}${triggers.length ? " · " + triggers.join(", ") : ""}`;
 }
 
+// ── Workforce / skill-matrix Gantt ───────────────────────────────────
+// Primary resources (machines) sit above the skilled secondary resources
+// (Engineer, Technician...) that constrain them. Skilled resources keep
+// their own shifts, come in multiples (×N), and vary over time; a primary
+// job that needs a skill must wait until one is free.
+function workforceLane(row) {
+  const blocks = (row.blocks || []).map((b) => {
+    const left = ganttHourPct(b.start), width = ganttHourPct(b.end) - left;
+    return `<span class="wf-block ${b.kind || "job"}" style="left:${left}%;width:${width}%">${b.label ? `<em>${escapeHtml(b.label)}</em>` : ""}</span>`;
+  }).join("");
+  return `<div class="gantt-row"><span class="gantt-label">${escapeHtml(row.label)}${row.badge ? `<b>${escapeHtml(row.badge)}</b>` : ""}</span><div class="gantt-track${row.people ? " people" : ""}">${blocks}</div></div>`;
+}
+function workforceGanttMarkup(spec) {
+  const ticks = ganttTicks.map((h) => `<span style="left:${ganttHourPct(h)}%">${String(h).padStart(2, "0")}</span>`).join("");
+  return `
+    <div class="gantt gantt-wf" role="img" aria-label="Primary resources constrained by skilled secondary resources">
+      <div class="gantt-row gantt-axis"><span class="gantt-label"></span><div class="gantt-ticks">${ticks}</div></div>
+      <p class="gantt-group">Primary resources</p>
+      ${spec.primary.map((r) => workforceLane(r)).join("")}
+      <p class="gantt-group">Skilled secondary resources</p>
+      ${spec.skills.map((r) => workforceLane({ ...r, people: true })).join("")}
+    </div>
+    <div class="gantt-legend">
+      <span><i class="gantt-swatch shift"></i>Production run</span>
+      <span><i class="wf-key need"></i>Needs a skill</span>
+      <span><i class="wf-key wait"></i>Waiting for skill</span>
+      <span><i class="wf-key avail"></i>Skilled resource available (×N)</span>
+      <span><i class="gantt-swatch blocked"></i>None on shift</span>
+    </div>`;
+}
+
+// Fixed teaching example: two machines gated by an Engineer and a Technician.
+const workforceIntroSpec = {
+  primary: [
+    { label: "R1", blocks: [
+      { kind: "need", start: 6, end: 11, label: "needs Eng" },
+      { kind: "job", start: 11, end: 15, label: "Run" },
+      { kind: "wait", start: 15, end: 19, label: "waits for Eng" },
+    ] },
+    { label: "R2", blocks: [
+      { kind: "job", start: 7, end: 12, label: "Run" },
+      { kind: "need", start: 12, end: 20, label: "needs Tech" },
+    ] },
+  ],
+  skills: [
+    { label: "Engineer", badge: "×2 → ×1", blocks: [
+      { kind: "avail", start: 6, end: 13, label: "×2" },
+      { kind: "avail", start: 13, end: 19, label: "×1" },
+    ] },
+    { label: "Technician", badge: "1 shift", blocks: [
+      { kind: "avail", start: 7, end: 21, label: "×1" },
+    ] },
+  ],
+};
+
+// Draw the scoped workforce capabilities on the primary-plus-skilled timeline.
+function workforcePreviewSpec() {
+  const sc = (id) => workforceScope({ id });
+  const qualified = sc("qualification") !== "out";
+  const absence = sc("absence") === "full";
+  const shifts = sc("shift") === "full";
+  const engineer = shifts
+    ? [{ kind: "avail", start: 6, end: 14, label: "×2" }, { kind: "avail", start: 14, end: 22, label: "×1" }]
+    : [{ kind: "avail", start: 6, end: 18, label: "×2" }];
+  const technician = absence
+    ? [{ kind: "avail", start: 7, end: 12, label: "×1" }, { kind: "avail", start: 14, end: 21, label: "×1" }]
+    : [{ kind: "avail", start: 7, end: 21, label: "×1" }];
+  const r1 = qualified
+    ? [{ kind: "need", start: 6, end: 11, label: "needs Eng" }, { kind: "job", start: 11, end: 16, label: "Run" }, { kind: "need", start: 16, end: 21, label: "needs Eng" }]
+    : [{ kind: "job", start: 6, end: 13, label: "Run" }, { kind: "job", start: 14, end: 21, label: "Run" }];
+  const r2 = qualified
+    ? (absence
+      ? [{ kind: "job", start: 7, end: 12, label: "Run" }, { kind: "wait", start: 12, end: 14, label: "Tech absent" }, { kind: "need", start: 14, end: 20, label: "needs Tech" }]
+      : [{ kind: "job", start: 7, end: 11, label: "Run" }, { kind: "need", start: 11, end: 19, label: "needs Tech" }])
+    : [{ kind: "job", start: 7, end: 19, label: "Run" }];
+  return {
+    primary: [{ label: "R1", blocks: r1 }, { label: "R2", blocks: r2 }],
+    skills: [
+      { label: "Engineer", badge: shifts ? "2 shifts" : "", blocks: engineer },
+      { label: "Technician", badge: absence ? "absences" : "", blocks: technician },
+    ],
+  };
+}
+function workforcePreviewCaption() {
+  const sc = (id) => workforceScope({ id });
+  const full = workforceCapabilities.filter((c) => sc(c.id) === "full").map((c) => c.name.toLowerCase());
+  return `${laborIntensity()} labor intensity${full.length ? " · " + full.join(", ") : " · capabilities at basic scope"}`;
+}
+
 const steps = [
   {
     id: "welcome", phase: "Start", nav: "Welcome", cta: "Begin setup",
@@ -1134,6 +1223,17 @@ const steps = [
     },
   },
   {
+    id: "workforce-intro", phase: "Model", nav: "Workforce basics",
+    title: "Machines don't run themselves — skilled people gate them.",
+    sub: "Beyond the primary resources, operations need secondary skilled resources — an Engineer, a Technician, an operator with the right qualification. They keep their own shifts, come in limited numbers, and vary through the day, so a primary job can only run when its skill is free.",
+    hint: "An illustration only. The next screen captures how deeply to model the workforce.",
+    body: () => `
+      <p class="gantt-caption"><i data-lucide="info"></i> The skilled lanes below constrain the machines above. A job that needs an Engineer waits until one of the few Engineers on shift is free.</p>
+      ${workforceGanttMarkup(workforceIntroSpec)}
+      <p class="representative-note"><i data-lucide="info"></i> Engineers keep a different shift than the line and drop from ×2 to ×1 in the afternoon (so R1 then waits); Technicians keep their own single-person shift. Multiples, shifts, and absences all move this availability through time.</p>
+    `,
+  },
+  {
     id: "workforce", phase: "Model", nav: "Workforce planning",
     title: "How much workforce planning does this need?",
     sub: "Labor-bound operations plan people the way others plan machines. The recommended depth follows your operating archetypes — confirm or override how far each workforce capability is configured.",
@@ -1187,6 +1287,17 @@ const steps = [
         render();
       });
     },
+  },
+  {
+    id: "workforce-preview", phase: "Model", nav: "Workforce preview",
+    title: "How your workforce model shapes the schedule.",
+    sub: "The capabilities you scoped, drawn on the same primary-plus-skilled timeline. Representative people will carry this behavior until real qualifications and rosters replace it.",
+    hint: "Review the projected skill constraints, then continue.",
+    body: () => `
+      <div class="gantt-summary"><span>Workforce model</span><strong>${escapeHtml(workforcePreviewCaption())}</strong></div>
+      ${workforceGanttMarkup(workforcePreviewSpec())}
+      <p class="gantt-caption"><i data-lucide="info"></i> Illustrative single day. APS treats each skill as a finite, time-varying secondary resource and only schedules a primary operation when a qualified person is actually available.</p>
+    `,
   },
   {
     id: "execution", phase: "Model", nav: "Execution feedback",

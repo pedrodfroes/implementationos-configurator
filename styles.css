@@ -5176,6 +5176,80 @@ body.genesis-open {
   background-image: repeating-linear-gradient(135deg, rgba(102, 112, 132, 0.45) 0, rgba(102, 112, 132, 0.45) 2px, transparent 2px, transparent 6px);
 }
 
+/* Workforce / skill-matrix Gantt — primaries above, skilled people below. */
+.gantt-group {
+  margin: 8px 0 0;
+  font-size: 0.56rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.gantt-wf .gantt-track { background-image: none; background: var(--panel-2); }
+.gantt-wf .gantt-track.people {
+  background-color: var(--panel-2);
+  background-image: repeating-linear-gradient(135deg, rgba(102, 112, 132, 0.16) 0, rgba(102, 112, 132, 0.16) 1.5px, transparent 1.5px, transparent 7px);
+}
+
+.wf-block {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-size: 0.58rem;
+  font-weight: 700;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.wf-block em { font-style: normal; padding: 0 5px; }
+
+.wf-block.job {
+  background: color-mix(in srgb, var(--teal) 80%, #fff);
+  color: #0c4a44;
+  border: 1px solid color-mix(in srgb, var(--teal) 58%, #000);
+}
+
+.wf-block.need {
+  background: color-mix(in srgb, var(--teal) 80%, #fff);
+  color: #0c4a44;
+  border: 1px solid color-mix(in srgb, var(--teal) 58%, #000);
+  box-shadow: inset 4px 0 0 var(--amber);
+}
+
+.wf-block.wait {
+  color: var(--amber);
+  background-color: var(--amber-soft);
+  background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--amber) 45%, transparent) 0, color-mix(in srgb, var(--amber) 45%, transparent) 2px, transparent 2px, transparent 6px);
+  border: 1px solid color-mix(in srgb, var(--amber) 55%, transparent);
+}
+
+.wf-block.avail {
+  background: color-mix(in srgb, var(--violet) 60%, #fff);
+  color: #2b2b6b;
+  border: 1px solid var(--violet);
+}
+
+.wf-key {
+  display: inline-block;
+  width: 16px;
+  height: 13px;
+  border-radius: 3px;
+  border: 1px solid var(--line-strong);
+}
+
+.wf-key.need { background: color-mix(in srgb, var(--teal) 80%, #fff); box-shadow: inset 4px 0 0 var(--amber); border-color: var(--teal); }
+.wf-key.wait {
+  background-color: var(--amber-soft);
+  background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--amber) 45%, transparent) 0, color-mix(in srgb, var(--amber) 45%, transparent) 2px, transparent 2px, transparent 6px);
+  border-color: var(--amber);
+}
+.wf-key.avail { background: color-mix(in srgb, var(--violet) 60%, #fff); border-color: var(--violet); }
+
 .bom-profile,
 .capacity-profile,
 .execution-profile {
