@@ -1530,11 +1530,39 @@ const steps = [
           </div>
           <p>${escapeHtml(generated.replacementPolicy)}</p>
         </section>
+        ${(() => {
+          const est = estimateDataset();
+          const total = est.reduce((sum, [, n]) => sum + n, 0);
+          const params = datasetParams();
+          return `
+        <section class="dataset-gen" aria-label="Representative dataset generation">
+          <div class="dataset-head">
+            <div><span>Representative dataset</span><strong>${total.toLocaleString()} rows · ${est.length} tables</strong></div>
+            <button class="cta solid" id="generateDatasetBtn" type="button"><i data-lucide="database"></i><span>Generate dataset (.zip)</span></button>
+          </div>
+          <div class="dataset-tables">
+            ${est.map(([name, n]) => `<span><code>${escapeHtml(name)}</code><b>${n.toLocaleString()}</b></span>`).join("")}
+          </div>
+          <p class="dataset-note"><i data-lucide="info"></i> Synthetic, seeded, and built in your browser — nothing is uploaded. Item attributes and changeover matrices are stubbed (F=${params.families.toLocaleString()} families, S=${params.skus.toLocaleString()} SKUs); only <code>demand_orders</code> scales with SKUs.</p>
+        </section>`;
+        })()}
         <button class="ghost-btn wide" id="exportBtn" type="button"><i data-lucide="download"></i><span>Export handoff brief (JSON)</span></button>
       `;
     },
     attach: (root) => {
       root.querySelector("#exportBtn").addEventListener("click", exportBrief);
+      root.querySelector("#generateDatasetBtn")?.addEventListener("click", (event) => {
+        const btn = event.currentTarget;
+        const label = btn.querySelector("span");
+        btn.disabled = true;
+        label.textContent = "Generating…";
+        // Defer so the button repaints before the synchronous build runs.
+        setTimeout(() => {
+          try { generateDataset(); label.textContent = "Generated ✓"; }
+          catch (err) { console.error(err); label.textContent = "Failed — see console"; }
+          finally { btn.disabled = false; setTimeout(() => { label.textContent = "Generate dataset (.zip)"; }, 2500); }
+        }, 30);
+      });
     },
   },
 ];
