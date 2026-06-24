@@ -6216,6 +6216,35 @@ body.genesis-open {
   background: var(--panel);
 }
 
+.dataset-formats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.dataset-fmt {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 11px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel);
+  color: var(--muted);
+}
+
+.dataset-fmt.active {
+  border-color: var(--teal);
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+
+.dataset-fmt strong { font-size: 0.76rem; color: var(--ink); }
+.dataset-fmt.active strong { color: var(--teal); }
+.dataset-fmt small { font-size: 0.6rem; color: var(--muted); }
+
 .dataset-head {
   display: flex;
   align-items: center;
