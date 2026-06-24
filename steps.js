@@ -1541,15 +1541,16 @@ const steps = [
           <div class="dataset-formats">
             ${tab("generic", "Generic", "Neutral relational CSVs")}
             ${tab("opcenter", "Opcenter APS", "Preactor UserData schema")}
+            ${tab("planettogether", "PlanetTogether", "Excel staging workbook")}
           </div>
           <div class="dataset-head">
             <div><span>Representative dataset</span><strong>${total.toLocaleString()} rows · ${est.length} tables</strong></div>
-            <button class="cta solid" id="generateDatasetBtn" type="button"><i data-lucide="database"></i><span>Generate ${fmt === "opcenter" ? "Opcenter" : "dataset"} (.zip)</span></button>
+            <button class="cta solid" id="generateDatasetBtn" type="button"><i data-lucide="database"></i><span>Generate ${fmt === "planettogether" ? "PlanetTogether (.xlsx)" : fmt === "opcenter" ? "Opcenter (.zip)" : "dataset (.zip)"}</span></button>
           </div>
           <div class="dataset-tables">
             ${est.map(([name, n]) => `<span><code>${escapeHtml(name)}</code><b>${n.toLocaleString()}</b></span>`).join("")}
           </div>
-          <p class="dataset-note"><i data-lucide="info"></i> Synthetic, seeded, and built in your browser — nothing is uploaded. ${fmt === "opcenter" ? "Mapped onto the core Opcenter APS <code>UserData</code> tables; families become scheduled <code>Products</code>, skills and tanks become <code>SecondaryConstraints</code>." : "Item attributes and changeover matrices are stubbed"} (F=${params.families.toLocaleString()} families, S=${params.skus.toLocaleString()} SKUs).</p>
+          <p class="dataset-note"><i data-lucide="info"></i> Synthetic, seeded, and built in your browser — nothing is uploaded. ${fmt === "planettogether" ? "Mapped onto PlanetTogether's staging tables (Jobs → ManufacturingOrders → JobOperations); skills become <code>Capabilities</code>, tanks become <code>Resources</code> with <code>IsTank</code>. Downloads as an Excel workbook." : fmt === "opcenter" ? "Mapped onto the core Opcenter APS <code>UserData</code> tables; families become scheduled <code>Products</code>, skills and tanks become <code>SecondaryConstraints</code>." : "Item attributes and changeover matrices are stubbed"} (F=${params.families.toLocaleString()} families, S=${params.skus.toLocaleString()} SKUs).</p>
         </section>`;
         })()}
         <button class="ghost-btn wide" id="exportBtn" type="button"><i data-lucide="download"></i><span>Export handoff brief (JSON)</span></button>

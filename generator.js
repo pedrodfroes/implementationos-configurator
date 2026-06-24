@@ -292,6 +292,96 @@ function buildOpcenter(p, rng) {
   return out;
 }
 
+// ── PlanetTogether APS staging projection ────────────────────────────
+// Job/operation-centric model: Jobs -> ManufacturingOrders -> JobOperations
+// with per-operation JobResources (eligibility), JobResourceCapabilities
+// (skills), JobMaterials (BOM), and JobProducts (output). Capabilities are
+// the skills; Items hold both manufactured families and purchased materials;
+// tanks are Resources with IsTank. Emitted as an Excel workbook (sheet per
+// table), matching PlanetTogether's Excel import staging.
+function buildPlanetTogether(p, rng) {
+  const e = coreEntities(p, rng);
+  const out = [];
+  const T = (name, columns, rows) => out.push({ name, columns, rows });
+  const epoch = Date.UTC(2026, 0, 1);
+  const dt = (day) => new Date(epoch + day * 86400000).toISOString().slice(0, 10) + "T00:00:00";
+  const plantOf = (deptId) => (e.depts.find((d) => d.dept_id === deptId) || {}).plant_id || "";
+
+  T("Plants", ["PlantId", "Name", "Description", "ExternalId"],
+    e.plants.map((pl) => ({ PlantId: pl.node_id, Name: pl.name, Description: pl.level, ExternalId: pl.node_id })));
+  T("Departments", ["PlantId", "DepartmentId", "Name", "ExternalId", "PlantName"],
+    e.depts.map((d) => ({ PlantId: d.plant_id, DepartmentId: d.dept_id, Name: d.name, ExternalId: d.dept_id, PlantName: (e.plants.find((pl) => pl.node_id === d.plant_id) || {}).name })));
+
+  const resRows = e.resources.map((r) => ({ PlantId: plantOf(r.dept_id), DepartmentId: r.dept_id, ResourceId: r.resource_id, Name: r.name, CapacityType: "SingleTasking", StandardHourlyCost: 60, Active: "TRUE", ResourceType: "Machine", IsTank: "FALSE", ExternalId: r.resource_id }));
+  e.tanks.forEach((t) => resRows.push({ PlantId: plantOf(t.dept_id), DepartmentId: t.dept_id, ResourceId: t.tank_id, Name: `Tank ${t.tank_id}`, CapacityType: "SingleTasking", StandardHourlyCost: 0, Active: "TRUE", ResourceType: "Tank", IsTank: "TRUE", ExternalId: t.tank_id }));
+  T("Resources", ["PlantId", "DepartmentId", "ResourceId", "Name", "CapacityType", "StandardHourlyCost", "Active", "ResourceType", "IsTank", "ExternalId"], resRows);
+
+  T("Capabilities", ["CapabilityId", "Name", "Description", "ExternalId"],
+    e.skills.map((s) => ({ CapabilityId: s.skill_id, Name: s.name, Description: `${s.name} skill`, ExternalId: s.skill_id })));
+
+  const resByType = {}; e.resources.forEach((r) => { (resByType[r.resource_type] ||= []).push(r); });
+  const rc = [];
+  e.skills.forEach((s) => {
+    const types = e.qualification.filter((q) => q.skill_id === s.skill_id).map((q) => q.resource_type);
+    e.resources.filter((r) => types.includes(r.resource_type)).forEach((r) => rc.push({ CapabilityId: s.skill_id, PlantId: plantOf(r.dept_id), DepartmentId: r.dept_id, ResourceId: r.resource_id }));
+  });
+  T("ResourceCapabilities", ["CapabilityId", "PlantId", "DepartmentId", "ResourceId"], rc);
+
+  const wh = e.plants.map((pl, i) => ({ WarehouseId: `WH-${pad(i + 1)}`, Name: `Warehouse ${pl.name}`, ExternalId: `WH-${pad(i + 1)}`, TankWarehouse: "FALSE", StorageCapacity: 100000 }));
+  if (e.tanks.length) wh.push({ WarehouseId: "WH-TANK", Name: "Tank farm", ExternalId: "WH-TANK", TankWarehouse: "TRUE", StorageCapacity: 50000 });
+  T("Warehouses", ["WarehouseId", "Name", "ExternalId", "TankWarehouse", "StorageCapacity"], wh);
+
+  const items = e.families.map((f) => ({ ItemId: f.family_id, Name: f.name, Description: f.name, ExternalId: f.family_id, Source: "Make", ItemType: "Manufactured", DefaultLeadTimeDays: 0, BatchSize: 1, Cost: 0 }));
+  e.materials.forEach((m) => items.push({ ItemId: m.material_id, Name: m.name, Description: m.name, ExternalId: m.material_id, Source: "Purchase", ItemType: "Material", DefaultLeadTimeDays: m.lead_time_days, BatchSize: 1, Cost: +(1 + (parseInt(m.material_id.slice(-3), 10) % 50)).toFixed(2) }));
+  T("Items", ["ItemId", "Name", "Description", "ExternalId", "Source", "ItemType", "DefaultLeadTimeDays", "BatchSize", "Cost"], items);
+
+  // Work orders generated per family x period.
+  const routingByFam = {}; e.routing.forEach((r) => { (routingByFam[r.family_id] ||= []).push(r); });
+  const bomByFam = {}; e.bom.forEach((b) => { (bomByFam[b.family_id] ||= []).push(b); });
+  const jobs = [], mos = [], jprod = [], jops = [], jres = [], jcap = [], jmat = [], so = [], sol = [];
+  let jn = 0, rrn = 0, mrn = 0, son = 0;
+  const wh0 = wh[0].WarehouseId;
+  e.families.forEach((f, fi) => {
+    const ops = (routingByFam[f.family_id] || []).sort((a, b) => a.op_seq - b.op_seq);
+    const boms = bomByFam[f.family_id] || [];
+    const firstOp = ops.length ? ops[0].op_seq : 1;
+    const lastOp = ops.length ? ops[ops.length - 1].op_seq : 1;
+    for (let per = 0; per < p.periods; per++) {
+      jn++;
+      const jobId = `JOB-${pad(jn, 5)}`, moId = `MO-${pad(jn, 5)}`, need = dt(per * 7 + 5), qty = randInt(rng, 50, 2000);
+      jobs.push({ JobId: jobId, Name: `Job ${jobId}`, ExternalId: jobId, OrderNumber: jobId, NeedDateTime: need, Priority: randInt(rng, 1, 5), Product: f.family_id, Qty: qty });
+      mos.push({ JobId: jobId, ManufacturingOrderId: moId, Name: moId, RequiredQty: qty, ProductName: f.name, MoNeedDate: need, UOM: "EA", ExternalId: moId, Family: f.family_id });
+      jprod.push({ JobId: jobId, ManufacturingOrderId: moId, OperationId: lastOp, ProductId: `${moId}-P`, ItemId: f.family_id, TotalOutputQty: qty, WarehouseId: wh0, ExternalId: `${moId}-P` });
+      ops.forEach((op) => {
+        jops.push({ JobId: jobId, ManufacturingOrderId: moId, OperationId: op.op_seq, Name: `Op ${op.op_seq}`, SetupHours: +(0.2 + (fi % 4) * 0.1).toFixed(2), RequiredFinishQty: qty, QtyPerCycle: 1, MinutesPerCycle: +(op.run_time_per_unit * 60).toFixed(1), UOM: "EA", ExternalId: `${moId}-OP${op.op_seq}` });
+        rrn++;
+        const rrId = `RR-${pad(rrn, 6)}`;
+        const elig = resByType[op.resource_type] || [];
+        jres.push({ JobId: jobId, ManufacturingOrderId: moId, OperationId: op.op_seq, ResourceRequirementId: rrId, IsPrimary: "TRUE", DefaultResourceId: elig.length ? elig[0].resource_id : "", Description: op.resource_type, ExternalId: rrId });
+        if (op.skill_required) jcap.push({ JobId: jobId, ManufacturingOrderId: moId, OperationId: op.op_seq, ResourceRequirementId: rrId, CapabilityId: op.skill_required, CapabilityExternalId: op.skill_required });
+      });
+      boms.forEach((b) => { mrn++; jmat.push({ JobId: jobId, ManufacturingOrderId: moId, OperationId: firstOp, MaterialRequirementId: `MR-${pad(mrn, 7)}`, MaterialName: b.component_ref, ItemExternalId: b.component_ref, TotalRequiredQty: +(b.qty_per * qty).toFixed(1), Source: "Purchase", LeadTimeDays: 7, UOM: b.uom, ExternalId: `MR-${pad(mrn, 7)}` }); });
+      son++;
+      const soId = `SO-${pad(son, 5)}`;
+      so.push({ SalesOrderId: soId, ExternalId: soId, Name: soId, Customer: `CUST-${pad(randInt(rng, 1, 40))}` });
+      sol.push({ SalesOrderId: soId, SalesOrderLineId: 1, ItemId: f.family_id, LineNumber: 1, UnitPrice: +(10 + rng() * 90).toFixed(2), Description: f.name });
+    }
+  });
+  T("Jobs", ["JobId", "Name", "ExternalId", "OrderNumber", "NeedDateTime", "Priority", "Product", "Qty"], jobs);
+  T("ManufacturingOrders", ["JobId", "ManufacturingOrderId", "Name", "RequiredQty", "ProductName", "MoNeedDate", "UOM", "ExternalId", "Family"], mos);
+  T("JobProducts", ["JobId", "ManufacturingOrderId", "OperationId", "ProductId", "ItemId", "TotalOutputQty", "WarehouseId", "ExternalId"], jprod);
+  T("JobOperations", ["JobId", "ManufacturingOrderId", "OperationId", "Name", "SetupHours", "RequiredFinishQty", "QtyPerCycle", "MinutesPerCycle", "UOM", "ExternalId"], jops);
+  T("JobResources", ["JobId", "ManufacturingOrderId", "OperationId", "ResourceRequirementId", "IsPrimary", "DefaultResourceId", "Description", "ExternalId"], jres);
+  T("JobResourceCapabilities", ["JobId", "ManufacturingOrderId", "OperationId", "ResourceRequirementId", "CapabilityId", "CapabilityExternalId"], jcap);
+  T("JobMaterials", ["JobId", "ManufacturingOrderId", "OperationId", "MaterialRequirementId", "MaterialName", "ItemExternalId", "TotalRequiredQty", "Source", "LeadTimeDays", "UOM", "ExternalId"], jmat);
+  T("SalesOrders", ["SalesOrderId", "ExternalId", "Name", "Customer"], so);
+  T("SalesOrderLines", ["SalesOrderId", "SalesOrderLineId", "ItemId", "LineNumber", "UnitPrice", "Description"], sol);
+  T("CapacityIntervals", ["CapacityIntervalId", "Name", "ExternalId", "IntervalType", "StartDateTime", "EndDateTime", "DurationHrs", "NbrOfPeople"],
+    e.windows.map((w, i) => ({ CapacityIntervalId: `CI-${pad(i + 1)}`, Name: `${w[0]} shift`, ExternalId: `CI-${pad(i + 1)}`, IntervalType: "Online", StartDateTime: `2026-01-05T${w[1]}:00`, EndDateTime: `2026-01-05T${w[2]}:00`, DurationHrs: 8, NbrOfPeople: 0 })));
+
+  return out;
+}
+
 // ── Estimators ───────────────────────────────────────────────────────
 function estimateDataset(over = {}) {
   const p = datasetParams(over);
@@ -322,6 +412,7 @@ function estimateDataset(over = {}) {
 function estimateFor(format) {
   const p = datasetParams();
   if (format === "opcenter") return buildOpcenter(p, makeRng(p.seed)).map((t) => [t.name, t.rows.length]);
+  if (format === "planettogether") return buildPlanetTogether(p, makeRng(p.seed)).map((t) => [t.name, t.rows.length]);
   return estimateDataset();
 }
 
@@ -378,19 +469,68 @@ function zipStore(files) {
   return new Blob(chunks, { type: "application/zip" });
 }
 
+// ── Minimal XLSX writer (OOXML, inline strings, no dependency) ───────
+function colLetter(n) { let s = ""; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; }
+function xmlEsc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" }[c])); }
+function sheetXml(table) {
+  let xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1">';
+  table.columns.forEach((c, i) => { xml += `<c r="${colLetter(i + 1)}1" t="inlineStr"><is><t>${xmlEsc(c)}</t></is></c>`; });
+  xml += "</row>";
+  table.rows.forEach((r, ri) => {
+    const rn = ri + 2;
+    xml += `<row r="${rn}">`;
+    table.columns.forEach((c, i) => {
+      const v = r[c];
+      if (v == null || v === "") return;
+      const ref = `${colLetter(i + 1)}${rn}`;
+      if (typeof v === "number") xml += `<c r="${ref}"><v>${v}</v></c>`;
+      else xml += `<c r="${ref}" t="inlineStr"><is><t>${xmlEsc(v)}</t></is></c>`;
+    });
+    xml += "</row>";
+  });
+  return xml + "</sheetData></worksheet>";
+}
+function buildXlsx(tables) {
+  const enc = new TextEncoder();
+  const files = [];
+  let ct = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>';
+  tables.forEach((t, i) => { ct += `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`; });
+  ct += "</Types>";
+  files.push({ name: "[Content_Types].xml", data: enc.encode(ct) });
+  files.push({ name: "_rels/.rels", data: enc.encode('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>') });
+  let wb = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>';
+  let rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
+  tables.forEach((t, i) => {
+    wb += `<sheet name="${xmlEsc(t.name).slice(0, 31)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`;
+    rels += `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`;
+    files.push({ name: `xl/worksheets/sheet${i + 1}.xml`, data: enc.encode(sheetXml(t)) });
+  });
+  files.push({ name: "xl/workbook.xml", data: enc.encode(wb + "</sheets></workbook>") });
+  files.push({ name: "xl/_rels/workbook.xml.rels", data: enc.encode(rels + "</Relationships>") });
+  return zipStore(files); // .xlsx is a zip container
+}
+
 // ── Public: build the chosen format and trigger a local download ─────
 function generateDataset(format = "generic") {
   const p = datasetParams();
   const rng = makeRng(p.seed);
-  const tables = format === "opcenter" ? buildOpcenter(p, rng) : buildDataset(p, rng);
-  const enc = new TextEncoder();
-  const files = tables.map((t) => ({ name: `${t.name}.csv`, data: enc.encode(tableToCsv(t)) }));
-  files.push({ name: "manifest.json", data: enc.encode(JSON.stringify(datasetManifest(p, tables, format), null, 2)) });
-  const blob = zipStore(files);
+  let blob, filename, tables;
+  if (format === "planettogether") {
+    tables = buildPlanetTogether(p, rng);
+    blob = buildXlsx(tables);
+    filename = "implementationos-planettogether.xlsx";
+  } else {
+    tables = format === "opcenter" ? buildOpcenter(p, rng) : buildDataset(p, rng);
+    const enc = new TextEncoder();
+    const files = tables.map((t) => ({ name: `${t.name}.csv`, data: enc.encode(tableToCsv(t)) }));
+    files.push({ name: "manifest.json", data: enc.encode(JSON.stringify(datasetManifest(p, tables, format), null, 2)) });
+    blob = zipStore(files);
+    filename = format === "opcenter" ? "implementationos-opcenter-aps.zip" : "implementationos-dataset.zip";
+  }
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = format === "opcenter" ? "implementationos-opcenter-aps.zip" : "implementationos-dataset.zip";
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
   return tables.reduce((s, t) => s + t.rows.length, 0);
