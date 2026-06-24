@@ -62,6 +62,7 @@ const initialState = {
     quantitiesConfirmed: false,
   },
   variant: null, // null | "active" | "kept" | "reverted" | "skipped"
+  exportFormat: "generic", // "generic" | "opcenter"
   done: false,
 };
 

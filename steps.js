@@ -1531,19 +1531,25 @@ const steps = [
           <p>${escapeHtml(generated.replacementPolicy)}</p>
         </section>
         ${(() => {
-          const est = estimateDataset();
+          const fmt = state.exportFormat || "generic";
+          const est = estimateFor(fmt);
           const total = est.reduce((sum, [, n]) => sum + n, 0);
           const params = datasetParams();
+          const tab = (id, label, note) => `<button type="button" class="dataset-fmt${fmt === id ? " active" : ""}" data-export-format="${id}" aria-pressed="${fmt === id}"><strong>${label}</strong><small>${note}</small></button>`;
           return `
         <section class="dataset-gen" aria-label="Representative dataset generation">
+          <div class="dataset-formats">
+            ${tab("generic", "Generic", "Neutral relational CSVs")}
+            ${tab("opcenter", "Opcenter APS", "Preactor UserData schema")}
+          </div>
           <div class="dataset-head">
             <div><span>Representative dataset</span><strong>${total.toLocaleString()} rows · ${est.length} tables</strong></div>
-            <button class="cta solid" id="generateDatasetBtn" type="button"><i data-lucide="database"></i><span>Generate dataset (.zip)</span></button>
+            <button class="cta solid" id="generateDatasetBtn" type="button"><i data-lucide="database"></i><span>Generate ${fmt === "opcenter" ? "Opcenter" : "dataset"} (.zip)</span></button>
           </div>
           <div class="dataset-tables">
             ${est.map(([name, n]) => `<span><code>${escapeHtml(name)}</code><b>${n.toLocaleString()}</b></span>`).join("")}
           </div>
-          <p class="dataset-note"><i data-lucide="info"></i> Synthetic, seeded, and built in your browser — nothing is uploaded. Item attributes and changeover matrices are stubbed (F=${params.families.toLocaleString()} families, S=${params.skus.toLocaleString()} SKUs); only <code>demand_orders</code> scales with SKUs.</p>
+          <p class="dataset-note"><i data-lucide="info"></i> Synthetic, seeded, and built in your browser — nothing is uploaded. ${fmt === "opcenter" ? "Mapped onto the core Opcenter APS <code>UserData</code> tables; families become scheduled <code>Products</code>, skills and tanks become <code>SecondaryConstraints</code>." : "Item attributes and changeover matrices are stubbed"} (F=${params.families.toLocaleString()} families, S=${params.skus.toLocaleString()} SKUs).</p>
         </section>`;
         })()}
         <button class="ghost-btn wide" id="exportBtn" type="button"><i data-lucide="download"></i><span>Export handoff brief (JSON)</span></button>
@@ -1551,16 +1557,22 @@ const steps = [
     },
     attach: (root) => {
       root.querySelector("#exportBtn").addEventListener("click", exportBrief);
+      root.querySelectorAll("[data-export-format]").forEach((button) => button.addEventListener("click", () => {
+        state.exportFormat = button.dataset.exportFormat;
+        render();
+      }));
       root.querySelector("#generateDatasetBtn")?.addEventListener("click", (event) => {
         const btn = event.currentTarget;
         const label = btn.querySelector("span");
+        const fmt = state.exportFormat || "generic";
+        const original = label.textContent;
         btn.disabled = true;
         label.textContent = "Generating…";
         // Defer so the button repaints before the synchronous build runs.
         setTimeout(() => {
-          try { generateDataset(); label.textContent = "Generated ✓"; }
+          try { generateDataset(fmt); label.textContent = "Generated ✓"; }
           catch (err) { console.error(err); label.textContent = "Failed — see console"; }
-          finally { btn.disabled = false; setTimeout(() => { label.textContent = "Generate dataset (.zip)"; }, 2500); }
+          finally { btn.disabled = false; setTimeout(() => { label.textContent = original; }, 2500); }
         }, 30);
       });
     },
