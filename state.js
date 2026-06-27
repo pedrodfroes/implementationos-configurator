@@ -25,6 +25,14 @@ const initialState = {
     modifiersConfirmed: false,
   },
   constraint: null,
+  // Migration sentinels: purely-visual Gantt steps were added around the
+  // calendar and bottleneck steps. Each flag's absence in a saved session
+  // triggers the matching index shift.
+  calendarVisuals: true,
+  bottleneckVisuals: true,
+  tankVisuals: true,
+  transitionVisuals: true,
+  workforceVisuals: true,
   taxonomyMode: "representative",
   departmentTypes: [],
   resourceTypes: [],
@@ -54,6 +62,7 @@ const initialState = {
     quantitiesConfirmed: false,
   },
   variant: null, // null | "active" | "kept" | "reverted" | "skipped"
+  exportFormat: "generic", // "generic" | "opcenter"
   done: false,
 };
 
@@ -85,6 +94,43 @@ function load() {
         const vsIdx = steps.findIndex((step) => step.id === "volume-storage");
         if (vsIdx >= 0 && Number(saved.i || 0) >= vsIdx) state.i = Number(saved.i) + 1;
         if (vsIdx >= 0 && Number(saved.max || 0) >= vsIdx) state.max = Number(saved.max) + 1;
+      }
+      if (!("calendarVisuals" in saved)) {
+        // Two visual steps were inserted around the calendar step; shift the
+        // saved position past each one it already sits at or beyond.
+        ["calendar-gantt-intro", "calendar-gantt-preview"].forEach((id) => {
+          const idx = steps.findIndex((step) => step.id === id);
+          if (idx >= 0 && Number(state.i) >= idx) state.i = Number(state.i) + 1;
+          if (idx >= 0 && Number(state.max) >= idx) state.max = Number(state.max) + 1;
+        });
+      }
+      if (!("bottleneckVisuals" in saved)) {
+        ["bottleneck-intro", "bottleneck-preview"].forEach((id) => {
+          const idx = steps.findIndex((step) => step.id === id);
+          if (idx >= 0 && Number(state.i) >= idx) state.i = Number(state.i) + 1;
+          if (idx >= 0 && Number(state.max) >= idx) state.max = Number(state.max) + 1;
+        });
+      }
+      if (!("tankVisuals" in saved)) {
+        ["tank-intro", "tank-preview"].forEach((id) => {
+          const idx = steps.findIndex((step) => step.id === id);
+          if (idx >= 0 && Number(state.i) >= idx) state.i = Number(state.i) + 1;
+          if (idx >= 0 && Number(state.max) >= idx) state.max = Number(state.max) + 1;
+        });
+      }
+      if (!("transitionVisuals" in saved)) {
+        ["transition-intro", "transition-preview"].forEach((id) => {
+          const idx = steps.findIndex((step) => step.id === id);
+          if (idx >= 0 && Number(state.i) >= idx) state.i = Number(state.i) + 1;
+          if (idx >= 0 && Number(state.max) >= idx) state.max = Number(state.max) + 1;
+        });
+      }
+      if (!("workforceVisuals" in saved)) {
+        ["workforce-intro", "workforce-preview"].forEach((id) => {
+          const idx = steps.findIndex((step) => step.id === id);
+          if (idx >= 0 && Number(state.i) >= idx) state.i = Number(state.i) + 1;
+          if (idx >= 0 && Number(state.max) >= idx) state.max = Number(state.max) + 1;
+        });
       }
       if (!Array.isArray(saved.archetypes) && saved.archetype) state.archetypes = [saved.archetype];
       if (!("scope" in saved)) {

@@ -3523,7 +3523,8 @@ body.genesis-open {
 .installer {
   display: grid;
   grid-template-columns: 272px 1fr;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .rail {
@@ -3532,6 +3533,8 @@ body.genesis-open {
   padding: 26px 20px;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .rail-brand strong {
@@ -3664,7 +3667,9 @@ body.genesis-open {
 .stage-wrap {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
+  overflow: hidden;
   background: #f6f8fa;
 }
 
@@ -3712,9 +3717,11 @@ body.genesis-open {
 
 .stage-body {
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: safe center;
   padding: 8px 40px;
   max-width: 940px;
   width: 100%;
@@ -4803,6 +4810,446 @@ body.genesis-open {
   margin-top: 1px;
 }
 
+/* Capacity Gantt — the two calendar visualization steps. */
+.gantt {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 14px 0 4px;
+  padding: 16px 18px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  max-width: 760px;
+}
+
+.gantt-row {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  align-items: center;
+  gap: 12px;
+}
+
+.gantt-label {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.gantt-label b {
+  font-size: 0.54rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.gantt-axis { margin-bottom: 2px; }
+
+.gantt-ticks {
+  position: relative;
+  height: 14px;
+}
+
+.gantt-ticks span {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: 0.58rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.gantt-track {
+  position: relative;
+  height: 30px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  overflow: hidden;
+  background-color: var(--panel-2);
+  background-image: repeating-linear-gradient(135deg, rgba(102, 112, 132, 0.16) 0, rgba(102, 112, 132, 0.16) 1.5px, transparent 1.5px, transparent 7px);
+}
+
+.gantt-block {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 4px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.gantt-block em { font-style: normal; padding: 0 4px; }
+
+.gantt-block.shift {
+  background: var(--teal);
+  color: #fff;
+  border: 1px solid color-mix(in srgb, var(--teal) 80%, #000);
+}
+
+.gantt-block.exception {
+  color: var(--amber);
+  background-color: var(--amber-soft);
+  background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--amber) 45%, transparent) 0, color-mix(in srgb, var(--amber) 45%, transparent) 2px, transparent 2px, transparent 6px);
+  border: 1px solid color-mix(in srgb, var(--amber) 55%, transparent);
+}
+
+.gantt-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-top: 12px;
+  font-size: 0.64rem;
+  color: var(--muted);
+}
+
+.gantt-legend span { display: inline-flex; align-items: center; gap: 7px; }
+
+.gantt-swatch {
+  width: 16px;
+  height: 13px;
+  border-radius: 3px;
+  border: 1px solid var(--line-strong);
+}
+
+.gantt-swatch.shift { background: var(--teal); border-color: var(--teal); }
+
+.gantt-swatch.blocked {
+  background-color: var(--panel-2);
+  background-image: repeating-linear-gradient(135deg, rgba(102, 112, 132, 0.3) 0, rgba(102, 112, 132, 0.3) 1.5px, transparent 1.5px, transparent 6px);
+}
+
+.gantt-swatch.exception {
+  background-color: var(--amber-soft);
+  background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--amber) 50%, transparent) 0, color-mix(in srgb, var(--amber) 50%, transparent) 2px, transparent 2px, transparent 6px);
+  border-color: var(--amber);
+}
+
+.gantt-caption {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.gantt-caption i { width: 15px; height: 15px; flex: 0 0 15px; }
+
+.gantt-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 6px 0 4px;
+}
+
+.gantt-summary span {
+  font-size: 0.58rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.gantt-summary strong { font-size: 0.92rem; color: var(--ink); }
+
+/* Load variant: track shows idle slack (no hatch); blocks are committed
+   jobs; the bottleneck row or blocks are amber. */
+.gantt-load .gantt-track {
+  background-image: none;
+  background: var(--panel-2);
+}
+
+.gantt-block.job {
+  background: color-mix(in srgb, var(--teal) 78%, #fff);
+  border: 1px solid color-mix(in srgb, var(--teal) 80%, #000);
+  border-radius: 3px;
+}
+
+.gantt-block.job.ccr {
+  background: var(--amber);
+  border-color: color-mix(in srgb, var(--amber) 70%, #000);
+}
+
+.gantt-row.ccr .gantt-track {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 1px var(--amber);
+  background: color-mix(in srgb, var(--amber-soft) 55%, var(--panel-2));
+}
+
+.gantt-row.ccr .gantt-block.job {
+  background: var(--amber);
+  border-color: color-mix(in srgb, var(--amber) 70%, #000);
+}
+
+.gantt-row.ccr .gantt-label b { color: var(--amber); font-weight: 800; }
+
+.gantt-divider {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 0;
+  border-left: 1.5px dashed var(--line-strong);
+  z-index: 2;
+}
+
+.gantt-swatch.job { background: color-mix(in srgb, var(--teal) 78%, #fff); border-color: var(--teal); }
+.gantt-swatch.idle { background: var(--panel-2); }
+.gantt-swatch.ccr { background: var(--amber); border-color: var(--amber); }
+
+/* Tank level charts — fill level over time, drawn as SVG. */
+.tank-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  max-width: 760px;
+  margin: 12px 0 4px;
+}
+
+.tank-chart {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel);
+  padding: 8px 10px 6px;
+}
+
+.tank-name {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin-bottom: 4px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.tank-name b {
+  font-size: 0.55rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.tank-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: var(--panel-2);
+  border-radius: 6px;
+}
+
+.tank-svg line { vector-effect: non-scaling-stroke; }
+
+.tank-fill { stroke: none; }
+.tank-fill.mat-a { fill: color-mix(in srgb, var(--teal) 42%, #fff); }
+.tank-fill.mat-b { fill: color-mix(in srgb, var(--violet) 38%, #fff); }
+
+.tank-clean {
+  fill: color-mix(in srgb, var(--amber) 24%, #fff);
+  stroke: color-mix(in srgb, var(--amber) 55%, transparent);
+  stroke-width: 1;
+}
+
+.tank-guide { fill: none; stroke-width: 1; stroke-dasharray: 3 3; }
+.tank-guide.max { stroke: var(--amber); }
+.tank-guide.heel { stroke: var(--muted); }
+.tank-axis { stroke: var(--line-strong); stroke-width: 1; }
+
+.gantt-swatch.mat-a { background: color-mix(in srgb, var(--teal) 42%, #fff); border-color: var(--teal); }
+.gantt-swatch.mat-b { background: color-mix(in srgb, var(--violet) 38%, #fff); border-color: var(--violet); }
+.gantt-swatch.clean { background: color-mix(in srgb, var(--amber) 24%, #fff); border-color: var(--amber); }
+
+.tank-guide-key {
+  width: 16px;
+  height: 0;
+  border-top: 2px dashed var(--amber);
+  align-self: center;
+}
+.tank-guide-key.heel { border-top-color: var(--muted); }
+
+/* Setup / changeover / cleaning sequence lanes. */
+.seq-gantt {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 14px 0 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  max-width: 760px;
+}
+
+.seq-row {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  align-items: center;
+  gap: 12px;
+}
+
+.seq-label {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.seq-label b {
+  font-size: 0.54rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.seq-track {
+  position: relative;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+  overflow: hidden;
+}
+
+.seq-seg {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-size: 0.58rem;
+  font-weight: 700;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.seq-seg em { font-style: normal; padding: 0 4px; }
+
+.seq-seg.job {
+  background: color-mix(in srgb, var(--teal) 78%, #fff);
+  color: #0c4a44;
+  border: 1px solid color-mix(in srgb, var(--teal) 60%, #000);
+}
+
+.seq-seg.setup { background: var(--violet); color: #fff; }
+.seq-seg.changeover { background: var(--amber); color: #fff; }
+
+.seq-seg.cleaning {
+  background-color: var(--panel);
+  background-image: repeating-linear-gradient(135deg, rgba(102, 112, 132, 0.45) 0, rgba(102, 112, 132, 0.45) 2px, transparent 2px, transparent 6px);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+}
+
+/* A concurrent transition overlaps continuing production: a band on top. */
+.seq-seg.over {
+  top: 2px;
+  bottom: 56%;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.18);
+  z-index: 2;
+}
+
+.seq-swatch {
+  width: 16px;
+  height: 13px;
+  border-radius: 3px;
+  border: 1px solid var(--line-strong);
+}
+
+.seq-swatch.job { background: color-mix(in srgb, var(--teal) 78%, #fff); border-color: var(--teal); }
+.seq-swatch.setup { background: var(--violet); border-color: var(--violet); }
+.seq-swatch.changeover { background: var(--amber); border-color: var(--amber); }
+.seq-swatch.cleaning {
+  background-color: var(--panel);
+  background-image: repeating-linear-gradient(135deg, rgba(102, 112, 132, 0.45) 0, rgba(102, 112, 132, 0.45) 2px, transparent 2px, transparent 6px);
+}
+
+/* Workforce / skill-matrix Gantt — primaries above, skilled people below. */
+.gantt-group {
+  margin: 8px 0 0;
+  font-size: 0.56rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.gantt-wf .gantt-track { background-image: none; background: var(--panel-2); }
+.gantt-wf .gantt-track.people {
+  background-color: var(--panel-2);
+  background-image: repeating-linear-gradient(135deg, rgba(102, 112, 132, 0.16) 0, rgba(102, 112, 132, 0.16) 1.5px, transparent 1.5px, transparent 7px);
+}
+
+.wf-block {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-size: 0.58rem;
+  font-weight: 700;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.wf-block em { font-style: normal; padding: 0 5px; }
+
+.wf-block.job {
+  background: color-mix(in srgb, var(--teal) 80%, #fff);
+  color: #0c4a44;
+  border: 1px solid color-mix(in srgb, var(--teal) 58%, #000);
+}
+
+.wf-block.need {
+  background: color-mix(in srgb, var(--teal) 80%, #fff);
+  color: #0c4a44;
+  border: 1px solid color-mix(in srgb, var(--teal) 58%, #000);
+  box-shadow: inset 4px 0 0 var(--amber);
+}
+
+.wf-block.wait {
+  color: var(--amber);
+  background-color: var(--amber-soft);
+  background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--amber) 45%, transparent) 0, color-mix(in srgb, var(--amber) 45%, transparent) 2px, transparent 2px, transparent 6px);
+  border: 1px solid color-mix(in srgb, var(--amber) 55%, transparent);
+}
+
+.wf-block.avail {
+  background: color-mix(in srgb, var(--violet) 60%, #fff);
+  color: #2b2b6b;
+  border: 1px solid var(--violet);
+}
+
+.wf-key {
+  display: inline-block;
+  width: 16px;
+  height: 13px;
+  border-radius: 3px;
+  border: 1px solid var(--line-strong);
+}
+
+.wf-key.need { background: color-mix(in srgb, var(--teal) 80%, #fff); box-shadow: inset 4px 0 0 var(--amber); border-color: var(--teal); }
+.wf-key.wait {
+  background-color: var(--amber-soft);
+  background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--amber) 45%, transparent) 0, color-mix(in srgb, var(--amber) 45%, transparent) 2px, transparent 2px, transparent 6px);
+  border-color: var(--amber);
+}
+.wf-key.avail { background: color-mix(in srgb, var(--violet) 60%, #fff); border-color: var(--violet); }
+
 .bom-profile,
 .capacity-profile,
 .execution-profile {
@@ -5758,6 +6205,96 @@ body.genesis-open {
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
 }
+
+/* Representative dataset generator (Handoff). */
+.dataset-gen {
+  max-width: 700px;
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.dataset-formats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.dataset-fmt {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 11px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel);
+  color: var(--muted);
+}
+
+.dataset-fmt.active {
+  border-color: var(--teal);
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+
+.dataset-fmt strong { font-size: 0.76rem; color: var(--ink); }
+.dataset-fmt.active strong { color: var(--teal); }
+.dataset-fmt small { font-size: 0.6rem; color: var(--muted); }
+
+.dataset-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.dataset-head span {
+  font-size: 0.58rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.dataset-head strong { display: block; margin-top: 2px; font-size: 0.92rem; color: var(--ink); }
+.dataset-head .cta { flex: 0 0 auto; }
+
+.dataset-tables {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 4px 14px;
+}
+
+.dataset-tables span {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 0;
+  border-bottom: 1px dotted var(--line);
+  font-size: 0.68rem;
+}
+
+.dataset-tables code { color: var(--muted); font-family: ui-monospace, monospace; }
+.dataset-tables b { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+.dataset-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.45;
+}
+
+.dataset-note i { width: 14px; height: 14px; flex: 0 0 14px; margin-top: 2px; }
+.dataset-note code { font-family: ui-monospace, monospace; color: var(--ink); }
 
 .generated-heading,
 .generated-columns {
