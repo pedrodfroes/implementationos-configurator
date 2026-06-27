@@ -505,6 +505,46 @@ function workforcePreviewCaption() {
   return `${laborIntensity()} labor intensity${full.length ? " · " + full.join(", ") : " · capabilities at basic scope"}`;
 }
 
+function masterPlanningBoard() {
+  const mp = state.masterPlanning || initialState.masterPlanning;
+  const run = masterRunBehaviors.find((item) => item.id === mp.run)?.name || "Run behavior pending";
+  const objective = masterPlanningObjectives.find((item) => item.id === mp.objective)?.name || "Plan objective";
+  const grain = masterPlanningGrains.find((item) => item.id === mp.grain)?.name || "Planning grain";
+  const demand = Math.max(1, mp.demand?.length || 1);
+  const supply = Math.max(1, mp.supply?.length || 1);
+  const risk = Math.max(1, mp.capacity?.length || 1);
+  const periods = ["Wk 31", "Wk 32", "Wk 33", "Wk 34"];
+  return `
+    <div class="master-board" role="img" aria-label="Master planning balance by weekly bucket">
+      <div class="master-board-head">
+        <span><i data-lucide="calendar-range"></i>${escapeHtml(objective)}</span>
+        <strong>${escapeHtml(grain)}</strong>
+        <em>${escapeHtml(run)}</em>
+      </div>
+      <div class="master-periods">
+        ${periods.map((period, index) => {
+          const demandHeight = 34 + demand * 8 + index * 4;
+          const supplyHeight = 30 + supply * 7 + (index % 2) * 10;
+          const overloaded = risk > 2 && index === 2;
+          return `
+            <div class="master-period${overloaded ? " overloaded" : ""}">
+              <span>${period}</span>
+              <div class="master-bars">
+                <i class="demand" style="height:${demandHeight}px"></i>
+                <i class="supply" style="height:${supplyHeight}px"></i>
+              </div>
+              <small>${overloaded ? "rough-cut overload" : supplyHeight >= demandHeight ? "covered" : "short risk"}</small>
+            </div>`;
+        }).join("")}
+      </div>
+      <div class="master-legend">
+        <span><i class="demand"></i>Demand</span>
+        <span><i class="supply"></i>Supply</span>
+        <span><i class="overload"></i>Rough-cut exception</span>
+      </div>
+    </div>`;
+}
+
 const steps = [
   {
     id: "welcome", phase: "Start", nav: "Welcome", cta: "Begin setup",
@@ -524,29 +564,189 @@ const steps = [
   {
     id: "scope", phase: "Scope", nav: "Planning objective",
     title: "What are you actually trying to accomplish?",
-    sub: "Choose the planning level before describing the manufacturing archetype. Adjacent levels stay visible so the project boundary is explicit, but this demo currently supports APS and Detailed Scheduling only.",
-    hint: "Select Advanced Planning & Detailed Scheduling to continue.",
+    sub: "APS/DS remains the delivery lane. 03 Master Planning can be activated as an upstream layer when the project also needs period-level supply, inventory, and rough-cut feasibility.",
+    hint: "Select Advanced Planning & Detailed Scheduling to continue. Master Planning is optional.",
     gate: () => state.scope === "aps-ds",
     body: () => `
       <div class="scope-grid">
         ${planningLevels.map((item, index) => `
-          <button class="scope-card${item.available ? " available" : " inactive"}${state.scope === item.id ? " active" : ""}" type="button"
-            ${item.available ? `data-scope="${item.id}"` : "disabled"}
-            title="${item.available ? "Available in this demo" : "Visible for context; not active in this demo yet"}">
+          <button class="scope-card${item.available || item.id === "master" ? " available" : " inactive"}${state.scope === item.id || (item.id === "master" && state.masterPlanning?.enabled) ? " active" : ""}${item.id === "master" ? " optional" : ""}" type="button"
+            ${item.id === "master" ? `data-master-toggle="true"` : item.available ? `data-scope="${item.id}"` : "disabled"}
+            title="${item.id === "master" ? "Optional upstream lane for period-level planning" : item.available ? "Available in this demo" : "Visible for context; not active in this demo yet"}">
             <span class="scope-index">${String(index + 1).padStart(2, "0")}</span>
             <span class="scope-copy">
-              <span class="scope-topline"><strong>${escapeHtml(item.level)}</strong><em>${escapeHtml(item.horizon)}</em></span>
+              <span class="scope-topline"><strong>${escapeHtml(item.id === "master" ? "03 Master Planning" : item.level)}</strong><em>${escapeHtml(item.horizon)}</em></span>
               <span class="scope-question">${escapeHtml(item.question)}</span>
               <small>${escapeHtml(item.terms)}</small>
             </span>
-            <i data-lucide="${item.available ? "arrow-right" : "lock-keyhole"}"></i>
+            <i data-lucide="${item.id === "master" ? state.masterPlanning?.enabled ? "circle-check" : "plus" : item.available ? "arrow-right" : "lock-keyhole"}"></i>
           </button>
         `).join("")}
       </div>
+      <p class="representative-note"><i data-lucide="layers-3"></i> Current lane: ${state.masterPlanning?.enabled ? "03 Master Planning feeds APS/DS" : "APS/DS only"}. You can change this later.</p>
     `,
     attach: (root) => {
-      root.querySelector("[data-scope]")?.addEventListener("click", (event) => {
+      root.querySelectorAll("[data-scope]").forEach((button) => button.addEventListener("click", (event) => {
         state.scope = event.currentTarget.dataset.scope;
+        render();
+      }));
+      root.querySelector("[data-master-toggle]")?.addEventListener("click", () => {
+        state.masterPlanning.enabled = !state.masterPlanning.enabled;
+        state.masterPlanning.reviewed = false;
+        render();
+      });
+    },
+  },
+  {
+    id: "master-purpose", phase: "03 Master Plan", nav: "Purpose & inputs",
+    title: "Should Master Planning sit upstream of APS/DS?",
+    sub: "Use this when the project must create or validate a period-level supply plan before releasing exact work to detailed scheduling.",
+    hint: "Choose whether Master Planning is in scope. If it is, set purpose, grain, demand, and supply inputs.",
+    gate: () => !state.masterPlanning?.enabled ? !!state.masterPlanning?.reviewed : !!(state.masterPlanning.objective && state.masterPlanning.grain && state.masterPlanning.demand?.length && state.masterPlanning.supply?.length),
+    body: () => {
+      const mp = state.masterPlanning || initialState.masterPlanning;
+      const multi = (items, selected, attr) => items.map((item) => choiceTile(item.id, selected.includes(item.id), item.icon, item.name, item.note).replace("data-choice", attr)).join("");
+      return `
+        <div class="master-toggle">
+          <button type="button" class="${mp.enabled ? "active" : ""}" data-master-enabled="true" aria-pressed="${mp.enabled}"><i data-lucide="layers-3"></i><span><strong>Master Planning in scope</strong><small>Build period-level feasibility before APS/DS</small></span></button>
+          <button type="button" class="${!mp.enabled && mp.reviewed ? "active" : ""}" data-master-enabled="false" aria-pressed="${!mp.enabled && mp.reviewed}"><i data-lucide="circle-slash-2"></i><span><strong>APS/DS only</strong><small>Skip upstream master-plan configuration</small></span></button>
+        </div>
+        ${mp.enabled ? `
+          <div class="master-profile">
+            <section class="bom-dimension">
+              <h3>Planning purpose</h3>
+              <div class="choice-grid three compact" data-master-single="objective">
+                ${masterPlanningObjectives.map((item) => choiceTile(item.id, mp.objective === item.id, item.icon, item.name, item.note)).join("")}
+              </div>
+            </section>
+            <section class="bom-dimension">
+              <h3>Planning grain</h3>
+              <div class="choice-grid two compact" data-master-single="grain">
+                ${masterPlanningGrains.map((item) => choiceTile(item.id, mp.grain === item.id, item.icon, item.name, item.note)).join("")}
+              </div>
+            </section>
+            <section class="bom-dimension">
+              <h3>Demand inputs</h3>
+              <div class="choice-grid three compact">
+                ${multi(masterDemandInputs, mp.demand, "data-master-demand")}
+              </div>
+            </section>
+            <section class="bom-dimension">
+              <h3>Supply inputs</h3>
+              <div class="choice-grid three compact">
+                ${multi(masterSupplyInputs, mp.supply, "data-master-supply")}
+              </div>
+            </section>
+          </div>` : `<p class="representative-note"><i data-lucide="info"></i> Master Planning will be marked out of scope. APS/DS will receive orders from ERP, MES, or another upstream planning process.</p>`}
+      `;
+    },
+    attach: (root) => {
+      root.querySelectorAll("[data-master-enabled]").forEach((button) => button.addEventListener("click", () => {
+        state.masterPlanning.enabled = button.dataset.masterEnabled === "true";
+        state.masterPlanning.reviewed = !state.masterPlanning.enabled;
+        render();
+      }));
+      root.querySelectorAll("[data-master-single]").forEach((group) => group.querySelectorAll("[data-choice]").forEach((button) => button.addEventListener("click", () => {
+        state.masterPlanning[group.dataset.masterSingle] = button.dataset.choice;
+        state.masterPlanning.reviewed = false;
+        render();
+      })));
+      root.querySelectorAll("[data-master-demand]").forEach((button) => button.addEventListener("click", () => {
+        state.masterPlanning.demand = toggle(state.masterPlanning.demand, button.dataset.masterDemand);
+        state.masterPlanning.reviewed = false;
+        render();
+      }));
+      root.querySelectorAll("[data-master-supply]").forEach((button) => button.addEventListener("click", () => {
+        state.masterPlanning.supply = toggle(state.masterPlanning.supply, button.dataset.masterSupply);
+        state.masterPlanning.reviewed = false;
+        render();
+      }));
+    },
+  },
+  {
+    id: "master-policy", phase: "03 Master Plan", nav: "Policies & buckets",
+    title: "What makes the master plan feasible?",
+    sub: "This layer should not schedule every operation. It decides which period-level policies and rough-cut buckets can constrain supply before APS/DS takes over.",
+    hint: "Select policies, rough-cut buckets, and run behavior.",
+    gate: () => !state.masterPlanning?.enabled || !!(state.masterPlanning.policy?.length && state.masterPlanning.capacity?.length && state.masterPlanning.run),
+    body: () => {
+      const mp = state.masterPlanning || initialState.masterPlanning;
+      if (!mp.enabled) return `<div class="master-skip"><i data-lucide="circle-slash-2"></i><strong>Master Planning is out of scope.</strong><p>Continue to industry and APS/DS characterization.</p></div>`;
+      const multi = (items, selected, attr) => items.map((item) => choiceTile(item.id, selected.includes(item.id), item.icon, item.name, item.note).replace("data-choice", attr)).join("");
+      return `
+        <div class="master-profile">
+          <section class="bom-dimension">
+            <h3>Policy layer</h3>
+            <div class="choice-grid three compact">
+              ${multi(masterPolicies, mp.policy, "data-master-policy")}
+            </div>
+          </section>
+          <section class="bom-dimension">
+            <h3>Rough-cut capacity buckets</h3>
+            <div class="choice-grid three compact">
+              ${multi(masterCapacityBuckets, mp.capacity, "data-master-capacity")}
+            </div>
+          </section>
+          <section class="bom-dimension">
+            <h3>Planning run behavior</h3>
+            <div class="choice-grid three compact" data-master-single="run">
+              ${masterRunBehaviors.map((item) => choiceTile(item.id, mp.run === item.id, item.icon, item.name, item.note)).join("")}
+            </div>
+          </section>
+        </div>
+      `;
+    },
+    attach: (root) => {
+      root.querySelectorAll("[data-master-policy]").forEach((button) => button.addEventListener("click", () => {
+        state.masterPlanning.policy = toggle(state.masterPlanning.policy, button.dataset.masterPolicy);
+        state.masterPlanning.reviewed = false;
+        render();
+      }));
+      root.querySelectorAll("[data-master-capacity]").forEach((button) => button.addEventListener("click", () => {
+        state.masterPlanning.capacity = toggle(state.masterPlanning.capacity, button.dataset.masterCapacity);
+        state.masterPlanning.reviewed = false;
+        render();
+      }));
+      root.querySelectorAll("[data-master-single]").forEach((group) => group.querySelectorAll("[data-choice]").forEach((button) => button.addEventListener("click", () => {
+        state.masterPlanning[group.dataset.masterSingle] = button.dataset.choice;
+        state.masterPlanning.reviewed = false;
+        render();
+      })));
+    },
+  },
+  {
+    id: "master-handoff", phase: "03 Master Plan", nav: "APS handoff",
+    title: "What should Master Planning hand to APS/DS?",
+    sub: "The handoff should be precise enough for scheduling, but still leave exact timing, sequence, and resource assignment to APS/DS.",
+    hint: "Select at least one handoff output and confirm the Master Planning layer.",
+    gate: () => !state.masterPlanning?.enabled || !!(state.masterPlanning.handoff?.length && state.masterPlanning.reviewed),
+    body: () => {
+      const mp = state.masterPlanning || initialState.masterPlanning;
+      if (!mp.enabled) return `<div class="master-skip"><i data-lucide="circle-slash-2"></i><strong>Master Planning is out of scope.</strong><p>APS/DS will consume externally supplied orders and constraints.</p></div>`;
+      return `
+        ${masterPlanningBoard()}
+        <div class="master-profile">
+          <section class="bom-dimension">
+            <h3>Handoff package</h3>
+            <div class="choice-grid three compact">
+              ${masterHandoffOutputs.map((item) => choiceTile(item.id, mp.handoff.includes(item.id), item.icon, item.name, item.note).replace("data-choice", "data-master-handoff")).join("")}
+            </div>
+          </section>
+        </div>
+        <div class="volume-confirmation">
+          <div><i data-lucide="info"></i><p><strong>Master Planning stops at buckets.</strong> APS/DS still owns exact operation sequence, finite resource timing, changeovers, tanks, labor, and execution feedback.</p></div>
+          <button type="button" class="${mp.reviewed ? "active" : ""}" id="confirmMasterPlanning" ${mp.handoff.length ? "" : "disabled"}><i data-lucide="${mp.reviewed ? "circle-check" : "shield-check"}"></i><span>${mp.reviewed ? "Master Planning confirmed" : "Confirm Master Planning layer"}</span></button>
+        </div>
+      `;
+    },
+    attach: (root) => {
+      root.querySelectorAll("[data-master-handoff]").forEach((button) => button.addEventListener("click", () => {
+        state.masterPlanning.handoff = toggle(state.masterPlanning.handoff, button.dataset.masterHandoff);
+        state.masterPlanning.reviewed = false;
+        render();
+      }));
+      root.querySelector("#confirmMasterPlanning")?.addEventListener("click", () => {
+        state.masterPlanning.reviewed = true;
         render();
       });
     },
@@ -1463,6 +1663,7 @@ const steps = [
       const attrPicksTotal = Object.values(state.attr || {}).reduce((sum, slot) => sum + (slot?.picks?.length || 0), 0);
       const rows = [
         ["Planning objective", state.scope ? "done" : "open", state.scope === "aps-ds" ? "Advanced Planning & Detailed Scheduling" : "Not selected"],
+        ["03 Master Planning", masterPlanningConfigured() ? "done" : "open", masterPlanningSummary()],
         ["Industry contexts", selectedIndustryContexts().length ? "done" : "open", selectedIndustryContexts().length ? selectedIndustryContexts().map((context) => context.specialty).join(" · ") : "Not selected"],
         ["Operating archetypes", state.archetypes?.length ? "done" : "open", state.archetypes?.length ? archetypeSynthesis().title : "Not characterized"],
         ["Department taxonomy", state.departmentTypes?.length ? "done" : "open", state.departmentTypes?.length ? `${state.departmentTypes.length} semantic types selected` : "Not configured"],
@@ -1509,6 +1710,7 @@ const steps = [
       return `
         <div class="summary-grid">
           <div class="summary-card"><span>Objective</span><strong>${state.scope === "aps-ds" ? "APS / Detailed Scheduling" : "Pending"}</strong><small>hours-to-weeks planning horizon</small></div>
+          <div class="summary-card"><span>03 Master Planning</span><strong>${escapeHtml(masterPlanningSummary())}</strong><small>${state.masterPlanning?.enabled ? `${state.masterPlanning.handoff?.length || 0} handoff outputs to APS/DS` : "upstream layer"}</small></div>
           <div class="summary-card"><span>Industry coverage</span><strong>${industryLabel() ? escapeHtml(industryLabel()) : "Pending"}</strong><small>${selectedIndustryContexts().length ? escapeHtml(selectedIndustryContexts().map((context) => context.specialty).join(" · ")) : "context not selected"}</small></div>
           <div class="summary-card"><span>Representative data</span><strong>${generated.departments.length} departments · ${generated.resources.length} resources</strong><small>synthetic and replaceable</small></div>
           <div class="summary-card"><span>Volume storage</span><strong>${state.volumeStorage?.present ? `${state.volumeStorage.behaviors.length} behaviors` : state.volumeStorage?.present === false ? "Not in scope" : "Pending"}</strong><small>${state.volumeStorage?.present ? "dynamic occupancy, flow and eligibility model" : "tank scheduling profile"}</small></div>

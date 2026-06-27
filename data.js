@@ -399,6 +399,67 @@ const planningLevels = [
   { id: "monitoring", level: "Monitoring / control", horizon: "Real time–days", question: "Are we late, blocked, starved, overloaded, or deviating?", terms: "WIP control · ATP / CTP · exception management" },
 ];
 
+const masterPlanningObjectives = [
+  { id: "mps", icon: "calendar-range", name: "Master production schedule", note: "Finished goods and key intermediates planned by period" },
+  { id: "supply-plan", icon: "git-merge", name: "Site supply plan", note: "Allocate demand across sites, lines, suppliers, and transfers" },
+  { id: "rough-capacity", icon: "bar-chart-3", name: "Rough-cut capacity", note: "Expose bucket overloads before detailed sequencing" },
+  { id: "inventory-position", icon: "boxes", name: "Inventory positioning", note: "Balance service, shelf life, safety stock, and working capital" },
+  { id: "promise-support", icon: "badge-check", name: "ATP / CTP support", note: "Use plan feasibility to support promise dates" },
+];
+
+const masterPlanningGrains = [
+  { id: "sku-location", icon: "map-pin", name: "SKU-location", note: "Each item planned at each plant, storage location, or warehouse" },
+  { id: "family-period", icon: "layers-3", name: "Product family", note: "Aggregate first, then disaggregate before scheduling" },
+  { id: "campaign-family", icon: "repeat", name: "Campaign family", note: "Useful where changeovers, cleaning, or campaigns dominate" },
+  { id: "material-group", icon: "package-search", name: "Material group", note: "Useful for constrained inputs, APIs, wood, tanks, or alloys" },
+];
+
+const masterDemandInputs = [
+  { id: "forecast", icon: "line-chart", name: "Forecast", note: "Baseline demand by period" },
+  { id: "sales-orders", icon: "shopping-cart", name: "Sales orders", note: "Firm demand and promise commitments" },
+  { id: "safety-stock", icon: "shield", name: "Safety stock / target cover", note: "Inventory policy becomes planned demand" },
+  { id: "intercompany", icon: "building-2", name: "Intercompany demand", note: "Demand from sister sites, DCs, or affiliates" },
+  { id: "launch-phaseout", icon: "rocket", name: "Launch / phase-out", note: "Controlled ramps, run-outs, and substitutions" },
+];
+
+const masterSupplyInputs = [
+  { id: "inventory", icon: "warehouse", name: "Inventory", note: "Projected usable stock by location, lot, and shelf life" },
+  { id: "planned-orders", icon: "clipboard-list", name: "Planned orders", note: "Supply proposals created by the planning run" },
+  { id: "purchase-orders", icon: "truck", name: "Purchase orders", note: "Dated external supply, hard or soft by material policy" },
+  { id: "transfer-orders", icon: "shuffle", name: "Transfer orders", note: "Inter-site supply that may gate feasibility" },
+  { id: "production-orders", icon: "factory", name: "Production orders", note: "Firmed or released supply already in motion" },
+];
+
+const masterPolicies = [
+  { id: "lot-sizing", icon: "ruler", name: "Lot sizing / MOQ", note: "Minimums, multiples, economic lots, and campaign quantities" },
+  { id: "fences", icon: "lock", name: "Frozen and firming fences", note: "Near-term plan stability and planner override rules" },
+  { id: "shelf-life", icon: "hourglass", name: "Shelf-life logic", note: "Minimum remaining life, expiry risk, and FEFO behavior" },
+  { id: "allocation", icon: "list-filter", name: "Allocation priorities", note: "Customer, market, site, product, or margin priorities" },
+  { id: "alternate-sourcing", icon: "split", name: "Alternates", note: "Alternate materials, sites, suppliers, and routings" },
+];
+
+const masterCapacityBuckets = [
+  { id: "plant", icon: "factory", name: "Plant / site buckets", note: "Total supply feasibility by major location" },
+  { id: "line-family", icon: "workflow", name: "Line or work-center family", note: "Rough-cut load before exact resource assignment" },
+  { id: "labor-pool", icon: "users", name: "Labor pool", note: "Skills or crews that cap weekly output" },
+  { id: "tank-family", icon: "cylinder", name: "Tank / vessel family", note: "Volume occupancy summarized by period" },
+  { id: "critical-supplier", icon: "package-check", name: "Critical supplier", note: "Long-lead or non-expeditable inputs as capacity-like limits" },
+];
+
+const masterRunBehaviors = [
+  { id: "infinite-exceptions", icon: "alert-triangle", name: "Infinite with exceptions", note: "Plan freely, then show overloads and shortages" },
+  { id: "finite-buckets", icon: "gauge", name: "Finite by bucket", note: "Constrain selected buckets before APS/DS receives orders" },
+  { id: "scenario-comparison", icon: "copy", name: "Scenario comparison", note: "Compare demand, supply, inventory, and capacity assumptions" },
+];
+
+const masterHandoffOutputs = [
+  { id: "planned-orders", icon: "clipboard-check", name: "Planned orders", note: "Candidate production, purchase, and transfer proposals" },
+  { id: "pegging", icon: "network", name: "Demand-supply pegging", note: "Why each order exists and which demand it protects" },
+  { id: "capacity-overloads", icon: "activity", name: "Bucket overloads", note: "Rough-cut constraints to respect or escalate" },
+  { id: "inventory-projection", icon: "area-chart", name: "Projected inventory", note: "Period-end stock, cover, expiry, and shortage risk" },
+  { id: "aps-release", icon: "send", name: "APS release package", note: "Firmed supply horizon handed to detailed scheduling" },
+];
+
 // Setup / changeover / cleaning transitions. The time the line loses between
 // runs is its own model: what kind of transition, what inserts it, whether it
 // blocks the resource, and what it is keyed to. APS schedules around these.

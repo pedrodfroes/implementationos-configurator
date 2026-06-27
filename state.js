@@ -10,6 +10,18 @@ const initialState = {
   i: 0,
   max: 0,
   scope: null,
+  masterPlanning: {
+    enabled: false,
+    reviewed: false,
+    objective: null,
+    grain: null,
+    demand: [],
+    supply: [],
+    policy: [],
+    capacity: [],
+    run: null,
+    handoff: [],
+  },
   industryFirst: true,
   archetypes: [],
   industry: null,
@@ -139,6 +151,12 @@ function load() {
       } else if ("planningMode" in saved) {
         if (state.i > 6) state.i -= 1;
         if (state.max > 6) state.max -= 1;
+      }
+      if (!("masterPlanning" in saved)) {
+        state.masterPlanning = clone(initialState.masterPlanning);
+        const mpIdx = steps.findIndex((step) => step.id === "master-purpose");
+        if (mpIdx >= 0 && Number(saved.i || 0) >= mpIdx) state.i = Number(saved.i) + 3;
+        if (mpIdx >= 0 && Number(saved.max || 0) >= mpIdx) state.max = Number(saved.max) + 3;
       }
       delete state.planningMode;
       delete state.archetype;
