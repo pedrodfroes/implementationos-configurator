@@ -75,6 +75,18 @@ function exportBrief() {
   const brief = {
     product: "ImplementationOS for Manufacturing Software",
     planningObjective: planningLevels.find((item) => item.id === state.scope) || null,
+    masterPlanning: {
+      ...state.masterPlanning,
+      summary: masterPlanningSummary(),
+      objective: masterPlanningObjectives.find((item) => item.id === state.masterPlanning?.objective) || null,
+      grain: masterPlanningGrains.find((item) => item.id === state.masterPlanning?.grain) || null,
+      demandInputs: masterDemandInputs.filter((item) => state.masterPlanning?.demand?.includes(item.id)),
+      supplyInputs: masterSupplyInputs.filter((item) => state.masterPlanning?.supply?.includes(item.id)),
+      policies: masterPolicies.filter((item) => state.masterPlanning?.policy?.includes(item.id)),
+      capacityBuckets: masterCapacityBuckets.filter((item) => state.masterPlanning?.capacity?.includes(item.id)),
+      runBehavior: masterRunBehaviors.find((item) => item.id === state.masterPlanning?.run) || null,
+      handoffOutputs: masterHandoffOutputs.filter((item) => state.masterPlanning?.handoff?.includes(item.id)),
+    },
     industry: selectedIndustryContexts()[0] ? { ...selectedIndustryContexts()[0].sector, specialty: selectedIndustryContexts()[0].specialty } : null,
     industries: selectedIndustryContexts().map(({ industry: industryId, specialty, sector }) => ({ ...sector, id: industryId, specialty })),
     archetypes: selectedArchetypes().map(({ id, name, mode: archetypeMode }) => ({ id, name, mode: archetypeMode })),

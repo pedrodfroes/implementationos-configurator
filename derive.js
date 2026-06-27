@@ -62,6 +62,21 @@ function workforceScope(cap) {
 function executionSourceLabel() {
   return { erp: `${profile().badge} confirmations`, mes: "MES execution events", hybrid: `Hybrid MES + ${profile().badge}` }[state.execution?.source] || "Not configured";
 }
+function masterPlanningEnabled() {
+  return !!state.masterPlanning?.enabled;
+}
+function masterPlanningConfigured() {
+  const mp = state.masterPlanning || {};
+  if (!mp.enabled) return !!mp.reviewed;
+  return !!(mp.objective && mp.grain && mp.demand?.length && mp.supply?.length && mp.policy?.length && mp.capacity?.length && mp.run && mp.handoff?.length && mp.reviewed);
+}
+function masterPlanningSummary() {
+  const mp = state.masterPlanning || {};
+  if (!mp.enabled) return mp.reviewed ? "Not in scope" : "Not reviewed";
+  const objective = masterPlanningObjectives.find((item) => item.id === mp.objective)?.name || "Objective pending";
+  const grain = masterPlanningGrains.find((item) => item.id === mp.grain)?.name || "grain pending";
+  return `${objective} at ${grain}`;
+}
 function selectedDepartmentTypes() { return departmentTaxonomy.filter((item) => state.departmentTypes?.includes(item.id)); }
 function selectedResourceTypes() { return resourceTaxonomy.filter((item) => state.resourceTypes?.includes(item.id)); }
 function attributeProfile() {
@@ -137,6 +152,7 @@ function archetypeSynthesis() {
 function readiness() {
   let s = 16;
   if (state.scope) s += 12;
+  if (masterPlanningConfigured()) s += state.masterPlanning?.enabled ? 8 : 3;
   if (state.archetypes?.length) s += 8;
   if (selectedIndustryContexts().length) s += 6;
   if (state.departmentTypes?.length) s += 8;
