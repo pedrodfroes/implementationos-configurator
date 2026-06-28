@@ -250,3 +250,34 @@ function blueprintModel() {
   const draft = out.filter((x) => x.status === "draft").length;
   return { sections: out, confirmed, draft };
 }
+
+// The cockpit groups the linear steps into modules by phase. Each module
+// reports a status (done / active / todo) and a screen-completion count, so the
+// consultant can land on a hub and jump to whatever the SME is ready for
+// (direction E). A step counts as satisfied when its gate passes (or it has no
+// gate — intros, previews, the welcome). The linear flow inside a module is
+// unchanged; this is only a map over it.
+function moduleModel() {
+  const order = [];
+  const byPhase = new Map();
+  steps.forEach((step, idx) => {
+    const phase = typeof step.phase === "function" ? step.phase() : step.phase;
+    if (!byPhase.has(phase)) { byPhase.set(phase, []); order.push(phase); }
+    byPhase.get(phase).push(idx);
+  });
+  return order.map((phase) => {
+    const indices = byPhase.get(phase);
+    const firstIndex = indices[0];
+    const lastIndex = indices[indices.length - 1];
+    const reached = firstIndex <= state.max;
+    const passed = indices.filter((i) => {
+      if (i > state.max) return false; // not yet reached — don't count toward progress
+      const step = steps[i];
+      if (!step.gate) return true;
+      try { return !!step.gate(); } catch { return false; }
+    }).length;
+    const total = indices.length;
+    const status = state.done ? "done" : !reached ? "todo" : passed === total ? "done" : "active";
+    return { phase, indices, firstIndex, lastIndex, reached, passed, total, status };
+  });
+}

@@ -1750,7 +1750,7 @@ const steps = [
     },
   },
   {
-    id: "variant", phase: "Model", nav: "Try a variant",
+    id: "variant", phase: "Validate", nav: "Try a variant",
     title: "Want to try a variant before committing?",
     sub: "Branching lets you explore a taxonomy change in isolation. The example uses synthetic Packaging and Finished-Goods records, never customer master data.",
     hint: "Try it or skip to continue.",

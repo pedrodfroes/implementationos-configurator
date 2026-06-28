@@ -39,7 +39,7 @@ function renderRail() {
   rail.querySelectorAll("[data-goto]").forEach((b) =>
     b.addEventListener("click", () => {
       const idx = Number(b.dataset.goto);
-      if (idx <= state.max) { state.i = idx; state.done = false; render(); }
+      if (idx <= state.max) { state.i = idx; state.done = false; state.view = "flow"; render(); }
     })
   );
 
@@ -106,8 +106,64 @@ function renderBlueprint() {
   panel.querySelector("#bpExport")?.addEventListener("click", exportBrief);
 }
 
+function applyChrome() {
+  const btn = $("#cockpitToggle");
+  if (btn) {
+    const inHub = state.view === "cockpit" && !state.done;
+    btn.innerHTML = `<i data-lucide="${inHub ? "play" : "layout-grid"}"></i><span>${inHub ? "Resume" : "Cockpit"}</span>`;
+  }
+}
+
+function renderCockpit() {
+  $("#stageFoot").style.display = "none";
+  $("#stageCount").textContent = "Cockpit";
+  $("#stageBody").dataset.step = "cockpit";
+  const mods = moduleModel();
+  const r = readiness();
+  const counts = { done: 0, active: 0, todo: 0 };
+  mods.forEach((m) => { counts[m.status] += 1; });
+  const label = { done: "Confirmed", active: "In progress", todo: "Not started" };
+  const cards = mods
+    .map(
+      (m, n) => `
+      <button class="cockpit-card ${m.status}" type="button" data-module="${m.firstIndex}">
+        <div class="cc-top">
+          <span class="cc-idx">${String(n + 1).padStart(2, "0")}</span>
+          <span class="cc-badge ${m.status}">${label[m.status]}</span>
+        </div>
+        <strong>${escapeHtml(m.phase)}</strong>
+        <div class="cc-bar"><i style="width:${Math.round((m.passed / m.total) * 100)}%"></i></div>
+        <small>${m.passed} of ${m.total} screen${m.total === 1 ? "" : "s"}</small>
+      </button>`
+    )
+    .join("");
+  $("#stageBody").innerHTML = `
+    <div class="cockpit">
+      <div class="cockpit-head">
+        <div class="ring" style="--p:${r}"><span>${r}<small>%</small></span></div>
+        <div>
+          <h2>Configuration cockpit</h2>
+          <p>Jump into any module — nothing is locked. Confirm decisions as the SME signs off; the blueprint on the right fills in live.</p>
+          <div class="cockpit-legend"><span class="done">● ${counts.done} confirmed</span><span class="active">● ${counts.active} in progress</span><span class="todo">● ${counts.todo} not started</span></div>
+        </div>
+      </div>
+      <div class="cockpit-grid">${cards}</div>
+    </div>`;
+  $("#stageBody").querySelectorAll("[data-module]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const idx = Number(b.dataset.module);
+      state.view = "flow";
+      state.done = false;
+      state.i = idx;
+      state.max = Math.max(state.max, idx);
+      render();
+    })
+  );
+}
+
 function render() {
-  if (state.done) { renderRail(); renderCompletion(); renderBlueprint(); refreshIcons(); save(); return; }
+  if (state.done) { renderRail(); renderCompletion(); renderBlueprint(); applyChrome(); refreshIcons(); save(); return; }
+  if (state.view === "cockpit") { renderRail(); renderCockpit(); renderBlueprint(); applyChrome(); refreshIcons(); save(); return; }
   $("#stageFoot").style.display = "";
   const step = steps[state.i];
   renderRail();
@@ -136,6 +192,7 @@ function render() {
   $("#footHint").textContent = ok ? "" : hint || "";
 
   renderBlueprint();
+  applyChrome();
   refreshIcons();
   save();
 }
@@ -258,6 +315,10 @@ document.addEventListener("DOMContentLoaded", () => {
     save();
     renderBlueprint();
     refreshIcons();
+  });
+  $("#cockpitToggle")?.addEventListener("click", () => {
+    state.view = state.view === "cockpit" ? "flow" : "cockpit";
+    render();
   });
   $("#restartBtn").addEventListener("click", () => {
     state = clone(initialState);
