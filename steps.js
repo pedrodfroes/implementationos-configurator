@@ -1789,6 +1789,11 @@ const [industryStep] = steps.splice(industryStepIndex, 1);
 steps.splice(archetypeStepIndex, 0, industryStep);
 
 // ── Step UI helpers ──────────────────────────────────────────────────
+function toggle(arr, value) {
+  const set = new Set(arr || []);
+  set.has(value) ? set.delete(value) : set.add(value);
+  return [...set];
+}
 function choiceTile(value, active, icon, title, sub) {
   return `
     <button class="choice${active ? " active" : ""}" type="button" data-choice="${escapeHtml(value)}">
