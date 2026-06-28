@@ -4520,21 +4520,83 @@ body.genesis-open {
   max-width: 920px;
 }
 
+.scope-selection-strip {
+  max-width: 920px;
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  min-height: 58px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.scope-selection-strip.has-selection {
+  border-color: color-mix(in srgb, var(--teal) 42%, var(--line));
+  background: linear-gradient(90deg, rgba(13, 148, 136, 0.08), #ffffff);
+}
+
+.scope-selection-strip span,
+.scope-selection-strip em {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.scope-selection-strip strong {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+
+.scope-selection-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.scope-selection-chips span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--teal) 46%, var(--line));
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+
+.scope-selection-chips i {
+  width: 14px;
+  height: 14px;
+}
+
 .scope-card {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) 18px;
+  grid-template-columns: 28px minmax(0, 1fr) 28px;
   gap: 10px;
   align-items: start;
-  min-height: 112px;
+  min-height: 128px;
   padding: 14px;
   text-align: left;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
+  position: relative;
+  transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
 }
 
 .scope-card.inactive {
-  opacity: 0.48;
+  opacity: 0.56;
+  background: #f8fafc;
+  filter: grayscale(0.2);
   cursor: not-allowed;
 }
 
@@ -5328,8 +5390,27 @@ body.genesis-open {
 }
 
 .scope-card.active {
-  outline: 2px solid var(--teal);
-  outline-offset: -2px;
+  border-width: 2px;
+  background: linear-gradient(90deg, rgba(13, 148, 136, 0.16), rgba(204, 251, 241, 0.84));
+  outline: none;
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.14);
+}
+
+.scope-card.active::before {
+  content: "";
+  position: absolute;
+  inset: 12px auto 12px 0;
+  width: 4px;
+  border-radius: 0 999px 999px 0;
+  background: var(--teal);
+}
+
+.scope-card.optional.active {
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.18), rgba(255, 251, 235, 0.92));
+}
+
+.scope-card.optional.active::before {
+  background: var(--amber);
 }
 
 .scope-index {
@@ -5347,7 +5428,7 @@ body.genesis-open {
 .scope-copy {
   min-width: 0;
   flex-direction: column;
-  gap: 5px;
+  gap: 7px;
 }
 
 .scope-topline {
@@ -5381,14 +5462,80 @@ body.genesis-open {
   line-height: 1.35;
 }
 
-.scope-card > i {
-  width: 16px;
-  height: 16px;
+.scope-status {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 22px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
   color: var(--muted);
+  background: rgba(255, 255, 255, 0.76);
+  font-size: 0.64rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0;
 }
 
-.scope-card.available > i {
+.scope-status i {
+  width: 12px;
+  height: 12px;
+}
+
+.scope-status.selected {
+  border-color: var(--teal);
+  background: #ffffff;
   color: var(--teal);
+}
+
+.scope-card.optional .scope-status.selected {
+  border-color: var(--amber);
+  color: #9a5b00;
+}
+
+.scope-status.unavailable {
+  background: #f1f5f9;
+  color: #94a3b8;
+}
+
+.scope-marker {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: #ffffff;
+}
+
+.scope-marker i {
+  width: 15px;
+  height: 15px;
+}
+
+.scope-card.available .scope-marker {
+  color: var(--teal);
+}
+
+.scope-card.active .scope-marker {
+  border-color: var(--teal);
+  background: var(--teal);
+  color: #ffffff;
+}
+
+.scope-card.optional.active .scope-marker {
+  border-color: var(--amber);
+  background: var(--amber);
+  color: #ffffff;
+}
+
+.scope-card.inactive .scope-marker {
+  color: #94a3b8;
+  background: #f8fafc;
 }
 
 .taxonomy-grid {
@@ -7474,6 +7621,11 @@ body.genesis-open {
 
   .scope-grid {
     grid-template-columns: 1fr;
+  }
+
+  .scope-selection-strip {
+    grid-template-columns: 1fr;
+    align-items: start;
   }
 
   .master-toggle,
