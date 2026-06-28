@@ -170,6 +170,7 @@ function readiness() {
   if (masterPlanningConfigured()) s += state.masterPlanning?.enabled ? 8 : 3;
   if (state.archetypes?.length) s += 8;
   if (selectedIndustryContexts().length) s += 6;
+  if (architectureConfigured()) s += 5;
   if (state.departmentTypes?.length) s += 8;
   if (state.calendar?.layering && state.calendar?.pattern && state.calendar?.exceptions && state.calendar?.modifiersConfirmed) s += 8;
   if (state.constraint) s += 6;
@@ -209,6 +210,10 @@ function blueprintModel() {
 
   push("Operating archetype", s.archetypes?.length ? "confirmed" : null, s.archetypes?.length ? archetypeSynthesis().title : "");
   push("Industry context", selectedIndustryContexts().length ? "confirmed" : null, selectedIndustryContexts().map((c) => c.specialty).join(" · "));
+
+  const arch = s.architecture?.nodes;
+  if (Array.isArray(arch) && arch.length) push("System architecture", architectureConfigured() ? "confirmed" : "draft",
+    `${arch.length} system${arch.length === 1 ? "" : "s"} mapped`);
 
   const cal = s.calendar || {};
   const calConfirmed = cal.layering && cal.pattern && cal.exceptions && cal.modifiersConfirmed;
@@ -280,4 +285,54 @@ function moduleModel() {
     const status = state.done ? "done" : !reached ? "todo" : passed === total ? "done" : "active";
     return { phase, indices, firstIndex, lastIndex, reached, passed, total, status };
   });
+}
+
+// System architecture canvas (direction D / E step 3). The structural
+// connections layer modeled as a small topology: ERP source → APS planning →
+// MES/MOM execution → shop floor, plus optional satellite systems. Each node
+// carries its own draft → confirmed state and the diagram becomes the
+// architecture page of the blueprint.
+const ARCH_SPINE = ["source", "planning", "execution", "shopfloor"];
+
+function architectureSeed() {
+  const erp = profile().badge;
+  const aps = { generic: "APS / DS", opcenter: "Opcenter APS", planettogether: "PlanetTogether" }[state.exportFormat] || "APS / DS";
+  const mes = { mes: "MES", hybrid: "MES + ERP", erp: "ERP confirmations" }[state.execution?.source] || "MES / MOM";
+  return [
+    { id: "erp", layer: "source", name: erp, status: "draft" },
+    { id: "aps", layer: "planning", name: aps, status: "draft" },
+    { id: "mes", layer: "execution", name: mes, status: "draft" },
+    { id: "floor", layer: "shopfloor", name: "Lines / SCADA", status: "draft" },
+  ];
+}
+
+function architectureNodes() {
+  const nodes = state.architecture?.nodes;
+  return Array.isArray(nodes) && nodes.length ? nodes : architectureSeed();
+}
+
+function architectureLayout() {
+  const nodes = architectureNodes();
+  const placed = [];
+  let spineY = 26;
+  let satY = 81;
+  nodes.forEach((n) => {
+    if (ARCH_SPINE.includes(n.layer)) { placed.push({ ...n, x: 120, y: spineY }); spineY += 110; }
+    else { placed.push({ ...n, x: 350, y: satY }); satY += 110; }
+  });
+  const spine = placed.filter((n) => ARCH_SPINE.includes(n.layer));
+  const edges = [];
+  for (let i = 0; i < spine.length - 1; i++) {
+    edges.push({ x1: spine[i].x + 75, y1: spine[i].y + 62, x2: spine[i + 1].x + 75, y2: spine[i + 1].y });
+  }
+  const planning = placed.find((n) => n.layer === "planning");
+  placed.filter((n) => !ARCH_SPINE.includes(n.layer)).forEach((n) => {
+    if (planning) edges.push({ x1: planning.x + 150, y1: planning.y + 31, x2: n.x, y2: n.y + 31 });
+  });
+  return { placed, edges, w: 540, h: Math.max(spineY, satY) + 16 };
+}
+
+function architectureConfigured() {
+  const nodes = state.architecture?.nodes;
+  return Array.isArray(nodes) && nodes.length > 0 && nodes.every((n) => n.status === "confirmed");
 }

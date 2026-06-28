@@ -585,6 +585,64 @@ function dispatchBoard() {
     </div>`;
 }
 
+// System-topology canvas: a fixed-layout graph (SVG edge layer + positioned
+// node buttons on a dotted grid) with an inspector for the selected node.
+const ARCH_LAYER_LABEL = { source: "Source", planning: "Planning", execution: "Execution", shopfloor: "Shop floor", analytics: "Analytics" };
+const ARCH_FLOWS = {
+  source: ["→ Master & transactional data"],
+  planning: ["← Orders, stock & status", "→ Released schedule"],
+  execution: ["← Dispatch list", "→ Confirmations & yields"],
+  shopfloor: ["← Work instructions", "→ Machine signals"],
+  analytics: ["← Plan & actuals"],
+};
+
+function archCanvasMarkup() {
+  const { placed, edges, w, h } = architectureLayout();
+  const selected = state.architecture?.selected || placed[0]?.id;
+  const svgEdges = edges.map((e) => `<line x1="${e.x1}" y1="${e.y1}" x2="${e.x2}" y2="${e.y2}" />`).join("");
+  const nodeButtons = placed
+    .map(
+      (n) => `
+      <button type="button" class="arch-node ${n.status}${n.id === selected ? " sel" : ""}" data-arch-node="${n.id}" style="left:${n.x}px;top:${n.y}px">
+        <span class="arch-layer">${ARCH_LAYER_LABEL[n.layer] || n.layer}</span>
+        <strong>${escapeHtml(n.name)}</strong>
+        <i class="arch-dot ${n.status}"></i>
+      </button>`
+    )
+    .join("");
+  const sel = placed.find((n) => n.id === selected) || placed[0];
+  const confirmedCount = placed.filter((n) => n.status === "confirmed").length;
+  return `
+    <div class="arch-wrap">
+      <div class="arch-canvas">
+        <div class="arch-inner" style="width:${w}px;height:${h}px">
+          <svg class="arch-edges" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${svgEdges}</svg>
+          ${nodeButtons}
+        </div>
+        <div class="arch-canvas-foot">
+          <button type="button" class="arch-add" data-arch-add="1"><i data-lucide="plus"></i>Add system</button>
+          <span class="arch-progress">${confirmedCount} of ${placed.length} confirmed</span>
+        </div>
+      </div>
+      <aside class="arch-inspector">${sel ? archInspector(sel) : ""}</aside>
+    </div>`;
+}
+
+function archInspector(n) {
+  const flows = ARCH_FLOWS[n.layer] || [];
+  const removable = !ARCH_SPINE.includes(n.layer);
+  return `
+    <div class="arch-insp-head"><span>${escapeHtml((ARCH_LAYER_LABEL[n.layer] || n.layer).toUpperCase())}</span><em class="arch-chip ${n.status}">${n.status === "confirmed" ? "Confirmed" : "Draft"}</em></div>
+    <label class="arch-field"><span>System</span><input type="text" id="archName" value="${escapeHtml(n.name)}" /></label>
+    <div class="arch-flows-label">Data flows</div>
+    ${flows.map((f) => `<div class="arch-flow">${escapeHtml(f)}</div>`).join("")}
+    <div class="arch-insp-foot">
+      ${removable ? `<button type="button" class="arch-del" data-arch-del="${n.id}"><i data-lucide="trash-2"></i></button>` : ""}
+      <button type="button" class="arch-confirm${n.status === "confirmed" ? " on" : ""}" data-arch-confirm="${n.id}"><i data-lucide="${n.status === "confirmed" ? "circle-check" : "shield-check"}"></i>${n.status === "confirmed" ? "Confirmed" : "Confirm node"}</button>
+    </div>
+    <button type="button" class="arch-confirm-all" data-arch-confirm-all="1">Confirm all systems</button>`;
+}
+
 const steps = [
   {
     id: "welcome", phase: "Start", nav: "Welcome", cta: "Begin setup",
@@ -984,6 +1042,54 @@ const steps = [
       </div>
     `,
     attach: (root) => bindChoices(root, (v) => { state.migration = v === "yes"; render(); }),
+  },
+  {
+    id: "architecture", phase: "Architecture", nav: "System topology",
+    title: "Map the system architecture.",
+    sub: "The connections layer as a live diagram: where planning sits between the ERP source and shop-floor execution. Click a node to configure it, then confirm. This diagram becomes the architecture page of the blueprint.",
+    hint: "Confirm every system node to continue.",
+    gate: () => architectureConfigured(),
+    body: () => archCanvasMarkup(),
+    attach: (root) => {
+      if (!state.architecture) state.architecture = { nodes: architectureSeed(), selected: null, reviewed: false };
+      if (!state.architecture.nodes?.length) state.architecture.nodes = architectureSeed();
+      if (!state.architecture.selected) state.architecture.selected = state.architecture.nodes[0].id;
+      const nodes = state.architecture.nodes;
+      const selected = () => nodes.find((n) => n.id === state.architecture.selected);
+      root.querySelectorAll("[data-arch-node]").forEach((b) => b.addEventListener("click", () => {
+        state.architecture.selected = b.dataset.archNode;
+        render();
+      }));
+      const name = root.querySelector("#archName");
+      name?.addEventListener("input", () => {
+        const n = selected();
+        if (!n) return;
+        n.name = name.value;
+        const label = root.querySelector(`[data-arch-node="${n.id}"] strong`);
+        if (label) label.textContent = name.value;
+        save();
+      });
+      root.querySelector("[data-arch-confirm]")?.addEventListener("click", (event) => {
+        const n = nodes.find((x) => x.id === event.currentTarget.dataset.archConfirm);
+        if (n) n.status = n.status === "confirmed" ? "draft" : "confirmed";
+        render();
+      });
+      root.querySelector("[data-arch-confirm-all]")?.addEventListener("click", () => {
+        nodes.forEach((n) => { n.status = "confirmed"; });
+        render();
+      });
+      root.querySelector("[data-arch-del]")?.addEventListener("click", (event) => {
+        state.architecture.nodes = nodes.filter((x) => x.id !== event.currentTarget.dataset.archDel);
+        state.architecture.selected = state.architecture.nodes[0]?.id || null;
+        render();
+      });
+      root.querySelector("[data-arch-add]")?.addEventListener("click", () => {
+        const id = "sys-" + Math.random().toString(36).slice(2, 7);
+        nodes.push({ id, layer: "analytics", name: "BI / Analytics", status: "draft" });
+        state.architecture.selected = id;
+        render();
+      });
+    },
   },
   {
     id: "calendar-gantt-intro", phase: () => organizationTerm(), nav: "Capacity basics",

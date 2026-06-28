@@ -24,6 +24,7 @@ const initialState = {
   },
   industryFirst: true,
   archetypes: [],
+  architecture: { nodes: [], selected: null, reviewed: false },
   industry: null,
   industrySpecialty: null,
   industryContexts: [],
@@ -169,6 +170,13 @@ function load() {
         const mpIdx = steps.findIndex((step) => step.id === "master-purpose");
         if (mpIdx >= 0 && Number(saved.i || 0) >= mpIdx) state.i = Number(saved.i) + 3;
         if (mpIdx >= 0 && Number(saved.max || 0) >= mpIdx) state.max = Number(saved.max) + 3;
+      }
+      if (!("architecture" in saved)) {
+        // One System-topology step was inserted after the migration step.
+        state.architecture = clone(initialState.architecture);
+        const aIdx = steps.findIndex((step) => step.id === "architecture");
+        if (aIdx >= 0 && Number(saved.i || 0) >= aIdx) state.i = Number(state.i) + 1;
+        if (aIdx >= 0 && Number(saved.max || 0) >= aIdx) state.max = Number(state.max) + 1;
       }
       if (!("dispatch" in saved)) {
         // Two dispatch steps were inserted just before the execution step.
