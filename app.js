@@ -67,8 +67,47 @@ function renderCompletion() {
   refreshIcons();
 }
 
+function applyBlueprintLayout() {
+  $("#installer")?.classList.toggle("bp-collapsed", !state.blueprintOpen);
+  $("#blueprintToggle")?.setAttribute("aria-pressed", String(!!state.blueprintOpen));
+}
+
+function renderBlueprint() {
+  applyBlueprintLayout();
+  const panel = $("#blueprintPanel");
+  if (!panel) return;
+  const bp = blueprintModel();
+  const sections = bp.sections
+    .map(
+      (sec) => `
+      <div class="bp-sec ${sec.status}">
+        <div class="bp-sec-head">
+          <i data-lucide="${sec.status === "confirmed" ? "circle-check" : "circle-dashed"}"></i>
+          <strong>${escapeHtml(sec.label)}</strong>
+          <em class="bp-chip ${sec.status}">${sec.status === "confirmed" ? "Confirmed" : "Draft"}</em>
+        </div>
+        ${sec.detail ? `<span class="bp-sec-detail">${escapeHtml(sec.detail)}</span>` : ""}
+      </div>`
+    )
+    .join("");
+  panel.innerHTML = `
+    <div class="bp-head">
+      <div><p class="bp-eyebrow">Deployment blueprint</p><strong>Writes itself as you decide</strong></div>
+      <span class="bp-live"><i data-lucide="circle-dot"></i>SME · live</span>
+    </div>
+    <div class="bp-doc">
+      <div class="bp-doc-top"><span class="bp-doc-title">APS pilot</span><span class="bp-ver">v0.${bp.confirmed} draft</span></div>
+      ${bp.sections.length ? sections : `<p class="bp-empty">The blueprint fills in here as you make decisions — confirmed sections settle in green, drafts stay flagged until the SME signs off.</p>`}
+      <div class="bp-foot">
+        <span><b class="bp-c">${bp.confirmed} confirmed</b> · <b class="bp-d">${bp.draft} draft</b></span>
+        <button type="button" class="bp-export" id="bpExport">Export ↗</button>
+      </div>
+    </div>`;
+  panel.querySelector("#bpExport")?.addEventListener("click", exportBrief);
+}
+
 function render() {
-  if (state.done) { renderRail(); renderCompletion(); save(); return; }
+  if (state.done) { renderRail(); renderCompletion(); renderBlueprint(); refreshIcons(); save(); return; }
   $("#stageFoot").style.display = "";
   const step = steps[state.i];
   renderRail();
@@ -96,6 +135,7 @@ function render() {
   const hint = typeof step.hint === "function" ? step.hint() : step.hint;
   $("#footHint").textContent = ok ? "" : hint || "";
 
+  renderBlueprint();
   refreshIcons();
   save();
 }
@@ -213,6 +253,12 @@ document.addEventListener("DOMContentLoaded", () => {
   load();
   $("#nextBtn").addEventListener("click", advance);
   $("#backBtn").addEventListener("click", () => { if (state.i > 0) { state.i -= 1; render(); } });
+  $("#blueprintToggle")?.addEventListener("click", () => {
+    state.blueprintOpen = !state.blueprintOpen;
+    save();
+    renderBlueprint();
+    refreshIcons();
+  });
   $("#restartBtn").addEventListener("click", () => {
     state = clone(initialState);
     try { localStorage.removeItem(UI_KEY); } catch {}

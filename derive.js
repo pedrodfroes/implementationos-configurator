@@ -187,3 +187,66 @@ function readiness() {
   if (state.migration) s -= 4;
   return Math.max(5, Math.min(99, Math.round(s)));
 }
+
+// The live blueprint: every decision the consultant has touched, projected as
+// a document section with an honest draft → confirmed state. Sections that use
+// an explicit confirm/review flag report "confirmed" only once that flag is
+// set; otherwise a touched-but-unconfirmed section reads "draft". Untouched
+// decisions are omitted so the document fills in as work happens (direction E).
+function blueprintModel() {
+  const s = state;
+  const out = [];
+  const push = (label, status, detail) => { if (status) out.push({ label, status, detail: detail || "" }); };
+
+  const lane = `${s.masterPlanning?.enabled ? "Master Planning → " : ""}APS/DS${s.dispatch?.enabled ? " → Dispatching" : ""}`;
+  push("Solution lane", s.scope ? "confirmed" : null, lane);
+
+  if (s.masterPlanning?.enabled) push("Master Planning", masterPlanningConfigured() ? "confirmed" : "draft", masterPlanningSummary());
+  else if (s.masterPlanning?.reviewed) push("Master Planning", "confirmed", "Out of scope");
+
+  if (s.dispatch?.enabled) push("Dispatching & execution", dispatchConfigured() ? "confirmed" : "draft", dispatchSummary());
+  else if (s.dispatch?.reviewed) push("Dispatching & execution", "confirmed", "Out of scope");
+
+  push("Operating archetype", s.archetypes?.length ? "confirmed" : null, s.archetypes?.length ? archetypeSynthesis().title : "");
+  push("Industry context", selectedIndustryContexts().length ? "confirmed" : null, selectedIndustryContexts().map((c) => c.specialty).join(" · "));
+
+  const cal = s.calendar || {};
+  const calConfirmed = cal.layering && cal.pattern && cal.exceptions && cal.modifiersConfirmed;
+  push("Calendars & capacity", calConfirmed ? "confirmed" : cal.layering ? "draft" : null, [calendarProfile()?.base, cal.pattern, cal.exceptions].filter(Boolean).join(" · "));
+
+  push("Bottleneck / CCR", s.constraint ? "confirmed" : null, s.constraint ? String(s.constraint).replace(/-/g, " ") : "");
+  push("Department taxonomy", s.departmentTypes?.length ? "confirmed" : null, s.departmentTypes?.length ? `${s.departmentTypes.length} semantic types` : "");
+  push("Resource taxonomy", s.resourceTypes?.length ? "confirmed" : null, s.resourceTypes?.length ? `${s.resourceTypes.length} capacity-object types` : "");
+
+  if (s.volumeStorage?.present === false) push("Volume storage", "confirmed", "Not in scope");
+  else if (s.volumeStorage?.confirmed) push("Volume storage", "confirmed", `${s.volumeStorage.behaviors.length} tank behaviors`);
+  else if (s.volumeStorage?.present) push("Volume storage", "draft", "Tank behaviors pending");
+
+  const famConfirmed = Object.values(s.attr || {}).filter((c) => c?.confirmed).length;
+  const famTouched = Object.values(s.attr || {}).filter((c) => c?.picks?.length).length;
+  if (famTouched) push("Item attributes", famConfirmed === famTouched ? "confirmed" : "draft", `${famConfirmed} of ${famTouched} famil${famTouched === 1 ? "y" : "ies"} confirmed`);
+
+  const tr = s.transitions || {};
+  const trTouched = tr.types?.length || tr.triggers?.length || tr.drivers?.length;
+  push("Setup & changeovers", transitionsConfigured() ? "confirmed" : trTouched ? "draft" : null, tr.types?.length ? `${tr.types.length} transition type${tr.types.length === 1 ? "" : "s"}` : "Transitions in review");
+
+  const bom = s.bom || {};
+  const bomConfirmed = bom.structure && bom.featuresConfirmed && bom.consumption && bom.source;
+  push("BOM profile", bomConfirmed ? "confirmed" : bom.structure ? "draft" : null, [bom.structure, bom.consumption, bom.source].filter(Boolean).join(" · "));
+
+  push("Critical supplies", s.supplies?.confirmed ? "confirmed" : Object.keys(s.supplies?.policies || {}).length ? "draft" : null,
+    s.supplies?.confirmed ? `${supplyProfiles().filter((p) => supplyPolicy(p) === "hard").length} hard constraints` : "Policy in review");
+  push("Workforce planning", s.workforce?.confirmed ? "confirmed" : Object.keys(s.workforce?.scopes || {}).length ? "draft" : null,
+    s.workforce?.confirmed ? `${workforceCapabilities.filter((c) => workforceScope(c) === "full").length} full-scope capabilities` : "Policy in review");
+
+  const ex = s.execution || {};
+  const exConfirmed = ex.source && ex.levels?.length && ex.events?.length && ex.quantitiesConfirmed;
+  push("Execution feedback", exConfirmed ? "confirmed" : ex.source ? "draft" : null, ex.source ? executionSourceLabel() : "");
+
+  push("Migration risk", s.migration ? "confirmed" : null, s.migration ? "S/4 migration on roadmap" : "");
+  push("Variant decision", s.variant && s.variant !== "active" ? "confirmed" : null, s.variant ? String(s.variant) : "");
+
+  const confirmed = out.filter((x) => x.status === "confirmed").length;
+  const draft = out.filter((x) => x.status === "draft").length;
+  return { sections: out, confirmed, draft };
+}

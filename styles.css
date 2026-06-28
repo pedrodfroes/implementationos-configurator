@@ -3522,9 +3522,244 @@ body.genesis-open {
 
 .installer {
   display: grid;
-  grid-template-columns: 272px 1fr;
+  grid-template-columns: 272px minmax(0, 1fr) 340px;
   height: 100vh;
   overflow: hidden;
+}
+
+.installer.bp-collapsed {
+  grid-template-columns: 272px minmax(0, 1fr);
+}
+
+.installer.bp-collapsed .blueprint {
+  display: none;
+}
+
+/* Below this width the third column crowds the stage; hide it and let the
+   header toggle bring it back only where there's room. */
+@media (max-width: 1180px) {
+  .installer {
+    grid-template-columns: 272px minmax(0, 1fr);
+  }
+  .blueprint {
+    display: none;
+  }
+}
+
+.stage-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.blueprint {
+  height: 100vh;
+  min-height: 0;
+  overflow-y: auto;
+  background: #e9edf1;
+  border-left: 1px solid var(--line);
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.bp-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.bp-eyebrow {
+  margin: 0;
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.bp-head strong {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--ink);
+  margin-top: 3px;
+  max-width: 170px;
+  line-height: 1.2;
+}
+
+.bp-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.6rem;
+  font-weight: 850;
+  color: #2f8f6b;
+  background: #e2f1ea;
+  border: 1px solid #c4e4d6;
+  padding: 4px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.bp-live i {
+  width: 9px;
+  height: 9px;
+}
+
+.bp-doc {
+  flex: 1;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bp-doc-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--line);
+}
+
+.bp-doc-title {
+  font-size: 0.78rem;
+  font-weight: 850;
+  color: var(--ink);
+}
+
+.bp-ver {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.6rem;
+  color: var(--muted);
+}
+
+.bp-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 9px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+}
+
+.bp-sec.confirmed {
+  border-color: #cfe7db;
+  background: #f4faf7;
+}
+
+.bp-sec.draft {
+  border: 1px dashed #e6cf9c;
+  background: #fdf8ee;
+}
+
+.bp-sec-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.bp-sec-head i {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+}
+
+.bp-sec.confirmed .bp-sec-head i {
+  color: #2f8f6b;
+}
+
+.bp-sec.draft .bp-sec-head i {
+  color: var(--amber);
+}
+
+.bp-sec-head strong {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.73rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.bp-chip {
+  font-style: normal;
+  font-size: 0.54rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+
+.bp-chip.confirmed {
+  color: #2f8f6b;
+  background: #e2f1ea;
+}
+
+.bp-chip.draft {
+  color: #9a6b18;
+  background: #f6ecd6;
+}
+
+.bp-sec-detail {
+  font-size: 0.66rem;
+  color: var(--muted);
+  padding-left: 20px;
+  line-height: 1.35;
+}
+
+.bp-empty {
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.5;
+  padding: 8px 2px;
+  margin: 0;
+}
+
+.bp-foot {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.bp-foot span {
+  font-size: 0.63rem;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.bp-c {
+  color: #2f8f6b;
+}
+
+.bp-d {
+  color: #9a6b18;
+}
+
+.bp-export {
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 0.67rem;
+  font-weight: 800;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.bp-export:hover {
+  border-color: var(--teal);
 }
 
 .rail {

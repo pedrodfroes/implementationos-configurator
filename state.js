@@ -85,6 +85,7 @@ const initialState = {
   },
   variant: null, // null | "active" | "kept" | "reverted" | "skipped"
   exportFormat: "generic", // "generic" | "opcenter"
+  blueprintOpen: true, // live blueprint drawer visibility (UI pref, not a step)
   done: false,
 };
 
