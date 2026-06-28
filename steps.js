@@ -604,26 +604,33 @@ const steps = [
   {
     id: "scope", phase: "Scope", nav: "Planning objective",
     title: "What are you actually trying to accomplish?",
-    sub: "APS/DS remains the delivery lane. 03 Master Planning can be activated as an upstream layer when the project also needs period-level supply, inventory, and rough-cut feasibility.",
-    hint: "Select Advanced Planning & Detailed Scheduling to continue. Master Planning is optional.",
+    sub: "APS/DS remains the delivery lane. Master Planning can be activated upstream, and Dispatching & execution downstream, when the project also needs them.",
+    hint: "Select Advanced Planning & Detailed Scheduling to continue. Master Planning and Dispatching are optional lanes.",
     gate: () => state.scope === "aps-ds",
     body: () => `
       <div class="scope-grid">
-        ${planningLevels.map((item, index) => `
-          <button class="scope-card${item.available || item.id === "master" ? " available" : " inactive"}${state.scope === item.id || (item.id === "master" && state.masterPlanning?.enabled) ? " active" : ""}${item.id === "master" ? " optional" : ""}" type="button"
-            ${item.id === "master" ? `data-master-toggle="true"` : item.available ? `data-scope="${item.id}"` : "disabled"}
-            title="${item.id === "master" ? "Optional upstream lane for period-level planning" : item.available ? "Available in this demo" : "Visible for context; not active in this demo yet"}">
+        ${planningLevels.map((item, index) => {
+          const optional = item.id === "master" || item.id === "dispatch";
+          const toggled = (item.id === "master" && state.masterPlanning?.enabled) || (item.id === "dispatch" && state.dispatch?.enabled);
+          const label = item.id === "master" ? "03 Master Planning" : item.id === "dispatch" ? "Dispatching & execution" : item.level;
+          const dataAttr = item.id === "master" ? `data-master-toggle="true"` : item.id === "dispatch" ? `data-dispatch-toggle="true"` : item.available ? `data-scope="${item.id}"` : "disabled";
+          const tooltip = item.id === "master" ? "Optional upstream lane for period-level planning" : item.id === "dispatch" ? "Optional downstream lane for shop-floor dispatch and execution" : item.available ? "Available in this demo" : "Visible for context; not active in this demo yet";
+          const icon = optional ? (toggled ? "circle-check" : "plus") : item.available ? "arrow-right" : "lock-keyhole";
+          return `
+          <button class="scope-card${item.available || optional ? " available" : " inactive"}${state.scope === item.id || toggled ? " active" : ""}${optional ? " optional" : ""}" type="button"
+            ${dataAttr}
+            title="${tooltip}">
             <span class="scope-index">${String(index + 1).padStart(2, "0")}</span>
             <span class="scope-copy">
-              <span class="scope-topline"><strong>${escapeHtml(item.id === "master" ? "03 Master Planning" : item.level)}</strong><em>${escapeHtml(item.horizon)}</em></span>
+              <span class="scope-topline"><strong>${escapeHtml(label)}</strong><em>${escapeHtml(item.horizon)}</em></span>
               <span class="scope-question">${escapeHtml(item.question)}</span>
               <small>${escapeHtml(item.terms)}</small>
             </span>
-            <i data-lucide="${item.id === "master" ? state.masterPlanning?.enabled ? "circle-check" : "plus" : item.available ? "arrow-right" : "lock-keyhole"}"></i>
-          </button>
-        `).join("")}
+            <i data-lucide="${icon}"></i>
+          </button>`;
+        }).join("")}
       </div>
-      <p class="representative-note"><i data-lucide="layers-3"></i> Current lane: ${state.masterPlanning?.enabled ? "03 Master Planning feeds APS/DS" : "APS/DS only"}. You can change this later.</p>
+      <p class="representative-note"><i data-lucide="layers-3"></i> Current lane: ${state.masterPlanning?.enabled ? "03 Master Planning → " : ""}APS/DS${state.dispatch?.enabled ? " → Dispatching & execution" : ""}. You can change this later.</p>
     `,
     attach: (root) => {
       root.querySelectorAll("[data-scope]").forEach((button) => button.addEventListener("click", (event) => {
@@ -633,6 +640,11 @@ const steps = [
       root.querySelector("[data-master-toggle]")?.addEventListener("click", () => {
         state.masterPlanning.enabled = !state.masterPlanning.enabled;
         state.masterPlanning.reviewed = false;
+        render();
+      });
+      root.querySelector("[data-dispatch-toggle]")?.addEventListener("click", () => {
+        state.dispatch.enabled = !state.dispatch.enabled;
+        state.dispatch.reviewed = false;
         render();
       });
     },
