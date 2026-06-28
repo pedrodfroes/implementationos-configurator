@@ -77,6 +77,21 @@ function masterPlanningSummary() {
   const grain = masterPlanningGrains.find((item) => item.id === mp.grain)?.name || "grain pending";
   return `${objective} at ${grain}`;
 }
+function dispatchEnabled() {
+  return !!state.dispatch?.enabled;
+}
+function dispatchConfigured() {
+  const d = state.dispatch || {};
+  if (!d.enabled) return !!d.reviewed;
+  return !!(d.objective && d.granularity && d.inputs?.length && d.policies?.length && d.channels?.length && d.reactivity && d.reviewed);
+}
+function dispatchSummary() {
+  const d = state.dispatch || {};
+  if (!d.enabled) return d.reviewed ? "Not in scope" : "Not reviewed";
+  const objective = dispatchObjectives.find((item) => item.id === d.objective)?.name || "Objective pending";
+  const grain = dispatchGranularities.find((item) => item.id === d.granularity)?.name || "grain pending";
+  return `${objective} · ${grain}`;
+}
 function selectedDepartmentTypes() { return departmentTaxonomy.filter((item) => state.departmentTypes?.includes(item.id)); }
 function selectedResourceTypes() { return resourceTaxonomy.filter((item) => state.resourceTypes?.includes(item.id)); }
 function attributeProfile() {
@@ -155,6 +170,7 @@ function readiness() {
   if (masterPlanningConfigured()) s += state.masterPlanning?.enabled ? 8 : 3;
   if (state.archetypes?.length) s += 8;
   if (selectedIndustryContexts().length) s += 6;
+  if (architectureConfigured()) s += 5;
   if (state.departmentTypes?.length) s += 8;
   if (state.calendar?.layering && state.calendar?.pattern && state.calendar?.exceptions && state.calendar?.modifiersConfirmed) s += 8;
   if (state.constraint) s += 6;
@@ -166,8 +182,157 @@ function readiness() {
   if (state.bom?.structure && state.bom?.featuresConfirmed && state.bom?.consumption && state.bom?.source) s += 8;
   if (state.supplies?.confirmed) s += 6;
   if (state.workforce?.confirmed) s += 6;
+  if (dispatchConfigured()) s += state.dispatch?.enabled ? 6 : 2;
   if (state.execution?.source && state.execution?.levels?.length && state.execution?.events?.length && state.execution?.quantitiesConfirmed) s += 8;
   if (state.variant && state.variant !== "active") s += 6;
   if (state.migration) s -= 4;
   return Math.max(5, Math.min(99, Math.round(s)));
+}
+
+// The live blueprint: every decision the consultant has touched, projected as
+// a document section with an honest draft → confirmed state. Sections that use
+// an explicit confirm/review flag report "confirmed" only once that flag is
+// set; otherwise a touched-but-unconfirmed section reads "draft". Untouched
+// decisions are omitted so the document fills in as work happens (direction E).
+function blueprintModel() {
+  const s = state;
+  const out = [];
+  const push = (label, status, detail) => { if (status) out.push({ label, status, detail: detail || "" }); };
+
+  const lane = `${s.masterPlanning?.enabled ? "Master Planning → " : ""}APS/DS${s.dispatch?.enabled ? " → Dispatching" : ""}`;
+  push("Solution lane", s.scope ? "confirmed" : null, lane);
+
+  if (s.masterPlanning?.enabled) push("Master Planning", masterPlanningConfigured() ? "confirmed" : "draft", masterPlanningSummary());
+  else if (s.masterPlanning?.reviewed) push("Master Planning", "confirmed", "Out of scope");
+
+  if (s.dispatch?.enabled) push("Dispatching & execution", dispatchConfigured() ? "confirmed" : "draft", dispatchSummary());
+  else if (s.dispatch?.reviewed) push("Dispatching & execution", "confirmed", "Out of scope");
+
+  push("Operating archetype", s.archetypes?.length ? "confirmed" : null, s.archetypes?.length ? archetypeSynthesis().title : "");
+  push("Industry context", selectedIndustryContexts().length ? "confirmed" : null, selectedIndustryContexts().map((c) => c.specialty).join(" · "));
+
+  const arch = s.architecture?.nodes;
+  if (Array.isArray(arch) && arch.length) push("System architecture", architectureConfigured() ? "confirmed" : "draft",
+    `${arch.length} system${arch.length === 1 ? "" : "s"} mapped`);
+
+  const cal = s.calendar || {};
+  const calConfirmed = cal.layering && cal.pattern && cal.exceptions && cal.modifiersConfirmed;
+  push("Calendars & capacity", calConfirmed ? "confirmed" : cal.layering ? "draft" : null, [calendarProfile()?.base, cal.pattern, cal.exceptions].filter(Boolean).join(" · "));
+
+  push("Bottleneck / CCR", s.constraint ? "confirmed" : null, s.constraint ? String(s.constraint).replace(/-/g, " ") : "");
+  push("Department taxonomy", s.departmentTypes?.length ? "confirmed" : null, s.departmentTypes?.length ? `${s.departmentTypes.length} semantic types` : "");
+  push("Resource taxonomy", s.resourceTypes?.length ? "confirmed" : null, s.resourceTypes?.length ? `${s.resourceTypes.length} capacity-object types` : "");
+
+  if (s.volumeStorage?.present === false) push("Volume storage", "confirmed", "Not in scope");
+  else if (s.volumeStorage?.confirmed) push("Volume storage", "confirmed", `${s.volumeStorage.behaviors.length} tank behaviors`);
+  else if (s.volumeStorage?.present) push("Volume storage", "draft", "Tank behaviors pending");
+
+  const famConfirmed = Object.values(s.attr || {}).filter((c) => c?.confirmed).length;
+  const famTouched = Object.values(s.attr || {}).filter((c) => c?.picks?.length).length;
+  if (famTouched) push("Item attributes", famConfirmed === famTouched ? "confirmed" : "draft", `${famConfirmed} of ${famTouched} famil${famTouched === 1 ? "y" : "ies"} confirmed`);
+
+  const tr = s.transitions || {};
+  const trTouched = tr.types?.length || tr.triggers?.length || tr.drivers?.length;
+  push("Setup & changeovers", transitionsConfigured() ? "confirmed" : trTouched ? "draft" : null, tr.types?.length ? `${tr.types.length} transition type${tr.types.length === 1 ? "" : "s"}` : "Transitions in review");
+
+  const bom = s.bom || {};
+  const bomConfirmed = bom.structure && bom.featuresConfirmed && bom.consumption && bom.source;
+  push("BOM profile", bomConfirmed ? "confirmed" : bom.structure ? "draft" : null, [bom.structure, bom.consumption, bom.source].filter(Boolean).join(" · "));
+
+  push("Critical supplies", s.supplies?.confirmed ? "confirmed" : Object.keys(s.supplies?.policies || {}).length ? "draft" : null,
+    s.supplies?.confirmed ? `${supplyProfiles().filter((p) => supplyPolicy(p) === "hard").length} hard constraints` : "Policy in review");
+  push("Workforce planning", s.workforce?.confirmed ? "confirmed" : Object.keys(s.workforce?.scopes || {}).length ? "draft" : null,
+    s.workforce?.confirmed ? `${workforceCapabilities.filter((c) => workforceScope(c) === "full").length} full-scope capabilities` : "Policy in review");
+
+  const ex = s.execution || {};
+  const exConfirmed = ex.source && ex.levels?.length && ex.events?.length && ex.quantitiesConfirmed;
+  push("Execution feedback", exConfirmed ? "confirmed" : ex.source ? "draft" : null, ex.source ? executionSourceLabel() : "");
+
+  push("Migration risk", s.migration ? "confirmed" : null, s.migration ? "S/4 migration on roadmap" : "");
+  push("Variant decision", s.variant && s.variant !== "active" ? "confirmed" : null, s.variant ? String(s.variant) : "");
+
+  const confirmed = out.filter((x) => x.status === "confirmed").length;
+  const draft = out.filter((x) => x.status === "draft").length;
+  return { sections: out, confirmed, draft };
+}
+
+// The cockpit groups the linear steps into modules by phase. Each module
+// reports a status (done / active / todo) and a screen-completion count, so the
+// consultant can land on a hub and jump to whatever the SME is ready for
+// (direction E). A step counts as satisfied when its gate passes (or it has no
+// gate — intros, previews, the welcome). The linear flow inside a module is
+// unchanged; this is only a map over it.
+function moduleModel() {
+  const order = [];
+  const byPhase = new Map();
+  steps.forEach((step, idx) => {
+    const phase = typeof step.phase === "function" ? step.phase() : step.phase;
+    if (!byPhase.has(phase)) { byPhase.set(phase, []); order.push(phase); }
+    byPhase.get(phase).push(idx);
+  });
+  return order.map((phase) => {
+    const indices = byPhase.get(phase);
+    const firstIndex = indices[0];
+    const lastIndex = indices[indices.length - 1];
+    const reached = firstIndex <= state.max;
+    const passed = indices.filter((i) => {
+      if (i > state.max) return false; // not yet reached — don't count toward progress
+      const step = steps[i];
+      if (!step.gate) return true;
+      try { return !!step.gate(); } catch { return false; }
+    }).length;
+    const total = indices.length;
+    const status = state.done ? "done" : !reached ? "todo" : passed === total ? "done" : "active";
+    return { phase, indices, firstIndex, lastIndex, reached, passed, total, status };
+  });
+}
+
+// System architecture canvas (direction D / E step 3). The structural
+// connections layer modeled as a small topology: ERP source → APS planning →
+// MES/MOM execution → shop floor, plus optional satellite systems. Each node
+// carries its own draft → confirmed state and the diagram becomes the
+// architecture page of the blueprint.
+const ARCH_SPINE = ["source", "planning", "execution", "shopfloor"];
+
+function architectureSeed() {
+  const erp = profile().badge;
+  const aps = { generic: "APS / DS", opcenter: "Opcenter APS", planettogether: "PlanetTogether" }[state.exportFormat] || "APS / DS";
+  const mes = { mes: "MES", hybrid: "MES + ERP", erp: "ERP confirmations" }[state.execution?.source] || "MES / MOM";
+  return [
+    { id: "erp", layer: "source", name: erp, status: "draft" },
+    { id: "aps", layer: "planning", name: aps, status: "draft" },
+    { id: "mes", layer: "execution", name: mes, status: "draft" },
+    { id: "floor", layer: "shopfloor", name: "Lines / SCADA", status: "draft" },
+  ];
+}
+
+function architectureNodes() {
+  const nodes = state.architecture?.nodes;
+  return Array.isArray(nodes) && nodes.length ? nodes : architectureSeed();
+}
+
+function architectureLayout() {
+  const nodes = architectureNodes();
+  const placed = [];
+  let spineY = 26;
+  let satY = 81;
+  nodes.forEach((n) => {
+    if (ARCH_SPINE.includes(n.layer)) { placed.push({ ...n, x: 120, y: spineY }); spineY += 110; }
+    else { placed.push({ ...n, x: 350, y: satY }); satY += 110; }
+  });
+  const spine = placed.filter((n) => ARCH_SPINE.includes(n.layer));
+  const edges = [];
+  for (let i = 0; i < spine.length - 1; i++) {
+    edges.push({ x1: spine[i].x + 75, y1: spine[i].y + 62, x2: spine[i + 1].x + 75, y2: spine[i + 1].y });
+  }
+  const planning = placed.find((n) => n.layer === "planning");
+  placed.filter((n) => !ARCH_SPINE.includes(n.layer)).forEach((n) => {
+    if (planning) edges.push({ x1: planning.x + 150, y1: planning.y + 31, x2: n.x, y2: n.y + 31 });
+  });
+  return { placed, edges, w: 540, h: Math.max(spineY, satY) + 16 };
+}
+
+function architectureConfigured() {
+  const nodes = state.architecture?.nodes;
+  return Array.isArray(nodes) && nodes.length > 0 && nodes.every((n) => n.status === "confirmed");
 }

@@ -32,10 +32,20 @@
       <section class="stage-wrap">
         <header class="stage-top">
           <span class="stage-count" id="stageCount"></span>
-          <button class="ghost-btn" id="restartBtn" type="button" title="Start over">
-            <i data-lucide="rotate-ccw"></i>
-            <span>Start over</span>
-          </button>
+          <div class="stage-top-actions">
+            <button class="ghost-btn" id="cockpitToggle" type="button" title="Configuration cockpit">
+              <i data-lucide="layout-grid"></i>
+              <span>Cockpit</span>
+            </button>
+            <button class="ghost-btn" id="blueprintToggle" type="button" title="Toggle live blueprint" aria-pressed="true">
+              <i data-lucide="panel-right"></i>
+              <span>Blueprint</span>
+            </button>
+            <button class="ghost-btn" id="restartBtn" type="button" title="Start over">
+              <i data-lucide="rotate-ccw"></i>
+              <span>Start over</span>
+            </button>
+          </div>
         </header>
 
         <div class="stage-body" id="stageBody" aria-live="polite"></div>
@@ -54,6 +64,8 @@
           </div>
         </footer>
       </section>
+
+      <aside class="blueprint" id="blueprintPanel" aria-label="Live deployment blueprint"></aside>
     </main>
   </body>
 </html>

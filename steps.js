@@ -545,6 +545,104 @@ function masterPlanningBoard() {
     </div>`;
 }
 
+// A small ordered dispatch list at one constraint resource, re-ranked by the
+// selected objective. Spoon-feeds what "dispatching" produces: a sequence the
+// floor runs next, with the reasons each job sits where it does.
+function dispatchBoard() {
+  const d = state.dispatch || initialState.dispatch;
+  const objective = dispatchObjectives.find((item) => item.id === d.objective)?.name || "Dispatch objective";
+  const grain = dispatchGranularities.find((item) => item.id === d.granularity)?.name || "Dispatch grain";
+  const reactivity = dispatchReactivities.find((item) => item.id === d.reactivity)?.name || "Reactivity pending";
+  const dueDate = d.objective === "due-date";
+  const setupFocus = d.objective === "changeover-min";
+  const jobs = [
+    { id: "WO-417", tag: dueDate ? "late" : "ready", note: dueDate ? "pulled up — 2 days late" : "material confirmed, on sequence" },
+    { id: "WO-402", tag: setupFocus ? "setup" : "ready", note: setupFocus ? "same changeover state — kept together" : "next in planned sequence" },
+    { id: "WO-435", tag: "ready", note: "released, awaiting the resource" },
+    { id: "WO-428", tag: "hold", note: "held — waiting on labor on shift" },
+  ];
+  return `
+    <div class="dispatch-board" role="img" aria-label="Dispatch list at a constraint resource">
+      <div class="dispatch-board-head">
+        <span><i data-lucide="list-ordered"></i>${escapeHtml(objective)}</span>
+        <strong>${escapeHtml(grain)}</strong>
+        <em>${escapeHtml(reactivity)}</em>
+      </div>
+      <ol class="dispatch-queue">
+        ${jobs.map((job, index) => `
+          <li class="dispatch-job ${job.tag}">
+            <span class="rank">${index + 1}</span>
+            <strong>${job.id}</strong>
+            <em>${escapeHtml(job.note)}</em>
+            <i class="badge">${job.tag}</i>
+          </li>`).join("")}
+      </ol>
+      <div class="dispatch-legend">
+        <span><i class="late"></i>Late / pulled up</span>
+        <span><i class="setup"></i>Setup-protected</span>
+        <span><i class="hold"></i>Held</span>
+      </div>
+    </div>`;
+}
+
+// System-topology canvas: a fixed-layout graph (SVG edge layer + positioned
+// node buttons on a dotted grid) with an inspector for the selected node.
+const ARCH_LAYER_LABEL = { source: "Source", planning: "Planning", execution: "Execution", shopfloor: "Shop floor", analytics: "Analytics" };
+const ARCH_FLOWS = {
+  source: ["→ Master & transactional data"],
+  planning: ["← Orders, stock & status", "→ Released schedule"],
+  execution: ["← Dispatch list", "→ Confirmations & yields"],
+  shopfloor: ["← Work instructions", "→ Machine signals"],
+  analytics: ["← Plan & actuals"],
+};
+
+function archCanvasMarkup() {
+  const { placed, edges, w, h } = architectureLayout();
+  const selected = state.architecture?.selected || placed[0]?.id;
+  const svgEdges = edges.map((e) => `<line x1="${e.x1}" y1="${e.y1}" x2="${e.x2}" y2="${e.y2}" />`).join("");
+  const nodeButtons = placed
+    .map(
+      (n) => `
+      <button type="button" class="arch-node ${n.status}${n.id === selected ? " sel" : ""}" data-arch-node="${n.id}" style="left:${n.x}px;top:${n.y}px">
+        <span class="arch-layer">${ARCH_LAYER_LABEL[n.layer] || n.layer}</span>
+        <strong>${escapeHtml(n.name)}</strong>
+        <i class="arch-dot ${n.status}"></i>
+      </button>`
+    )
+    .join("");
+  const sel = placed.find((n) => n.id === selected) || placed[0];
+  const confirmedCount = placed.filter((n) => n.status === "confirmed").length;
+  return `
+    <div class="arch-wrap">
+      <div class="arch-canvas">
+        <div class="arch-inner" style="width:${w}px;height:${h}px">
+          <svg class="arch-edges" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${svgEdges}</svg>
+          ${nodeButtons}
+        </div>
+        <div class="arch-canvas-foot">
+          <button type="button" class="arch-add" data-arch-add="1"><i data-lucide="plus"></i>Add system</button>
+          <span class="arch-progress">${confirmedCount} of ${placed.length} confirmed</span>
+        </div>
+      </div>
+      <aside class="arch-inspector">${sel ? archInspector(sel) : ""}</aside>
+    </div>`;
+}
+
+function archInspector(n) {
+  const flows = ARCH_FLOWS[n.layer] || [];
+  const removable = !ARCH_SPINE.includes(n.layer);
+  return `
+    <div class="arch-insp-head"><span>${escapeHtml((ARCH_LAYER_LABEL[n.layer] || n.layer).toUpperCase())}</span><em class="arch-chip ${n.status}">${n.status === "confirmed" ? "Confirmed" : "Draft"}</em></div>
+    <label class="arch-field"><span>System</span><input type="text" id="archName" value="${escapeHtml(n.name)}" /></label>
+    <div class="arch-flows-label">Data flows</div>
+    ${flows.map((f) => `<div class="arch-flow">${escapeHtml(f)}</div>`).join("")}
+    <div class="arch-insp-foot">
+      ${removable ? `<button type="button" class="arch-del" data-arch-del="${n.id}"><i data-lucide="trash-2"></i></button>` : ""}
+      <button type="button" class="arch-confirm${n.status === "confirmed" ? " on" : ""}" data-arch-confirm="${n.id}"><i data-lucide="${n.status === "confirmed" ? "circle-check" : "shield-check"}"></i>${n.status === "confirmed" ? "Confirmed" : "Confirm node"}</button>
+    </div>
+    <button type="button" class="arch-confirm-all" data-arch-confirm-all="1">Confirm all systems</button>`;
+}
+
 const steps = [
   {
     id: "welcome", phase: "Start", nav: "Welcome", cta: "Begin setup",
@@ -555,7 +653,7 @@ const steps = [
         <i data-lucide="route"></i>
       </div>
       <ul class="welcome-list">
-        <li><i data-lucide="target"></i><span>Use industry context to narrow the operating archetypes coherently.</span></li>
+        <li><i data-lucide="target"></i><span>Start from the planning archetype, not the industry.</span></li>
         <li><i data-lucide="git-branch"></i><span>Try changes on a branch before committing them.</span></li>
         <li><i data-lucide="gauge"></i><span>Watch readiness build as you make each decision.</span></li>
       </ul>
@@ -564,26 +662,33 @@ const steps = [
   {
     id: "scope", phase: "Scope", nav: "Planning objective",
     title: "What are you actually trying to accomplish?",
-    sub: "APS/DS remains the delivery lane. 03 Master Planning can be activated as an upstream layer when the project also needs period-level supply, inventory, and rough-cut feasibility.",
-    hint: "Select Advanced Planning & Detailed Scheduling to continue. Master Planning is optional.",
+    sub: "APS/DS remains the delivery lane. Master Planning can be activated upstream, and Dispatching & execution downstream, when the project also needs them.",
+    hint: "Select Advanced Planning & Detailed Scheduling to continue. Master Planning and Dispatching are optional lanes.",
     gate: () => state.scope === "aps-ds",
     body: () => `
       <div class="scope-grid">
-        ${planningLevels.map((item, index) => `
-          <button class="scope-card${item.available || item.id === "master" ? " available" : " inactive"}${state.scope === item.id || (item.id === "master" && state.masterPlanning?.enabled) ? " active" : ""}${item.id === "master" ? " optional" : ""}" type="button"
-            ${item.id === "master" ? `data-master-toggle="true"` : item.available ? `data-scope="${item.id}"` : "disabled"}
-            title="${item.id === "master" ? "Optional upstream lane for period-level planning" : item.available ? "Available in this demo" : "Visible for context; not active in this demo yet"}">
+        ${planningLevels.map((item, index) => {
+          const optional = item.id === "master" || item.id === "dispatch";
+          const toggled = (item.id === "master" && state.masterPlanning?.enabled) || (item.id === "dispatch" && state.dispatch?.enabled);
+          const label = item.id === "master" ? "03 Master Planning" : item.id === "dispatch" ? "Dispatching & execution" : item.level;
+          const dataAttr = item.id === "master" ? `data-master-toggle="true"` : item.id === "dispatch" ? `data-dispatch-toggle="true"` : item.available ? `data-scope="${item.id}"` : "disabled";
+          const tooltip = item.id === "master" ? "Optional upstream lane for period-level planning" : item.id === "dispatch" ? "Optional downstream lane for shop-floor dispatch and execution" : item.available ? "Available in this demo" : "Visible for context; not active in this demo yet";
+          const icon = optional ? (toggled ? "circle-check" : "plus") : item.available ? "arrow-right" : "lock-keyhole";
+          return `
+          <button class="scope-card${item.available || optional ? " available" : " inactive"}${state.scope === item.id || toggled ? " active" : ""}${optional ? " optional" : ""}" type="button"
+            ${dataAttr}
+            title="${tooltip}">
             <span class="scope-index">${String(index + 1).padStart(2, "0")}</span>
             <span class="scope-copy">
-              <span class="scope-topline"><strong>${escapeHtml(item.id === "master" ? "03 Master Planning" : item.level)}</strong><em>${escapeHtml(item.horizon)}</em></span>
+              <span class="scope-topline"><strong>${escapeHtml(label)}</strong><em>${escapeHtml(item.horizon)}</em></span>
               <span class="scope-question">${escapeHtml(item.question)}</span>
               <small>${escapeHtml(item.terms)}</small>
             </span>
-            <i data-lucide="${item.id === "master" ? state.masterPlanning?.enabled ? "circle-check" : "plus" : item.available ? "arrow-right" : "lock-keyhole"}"></i>
-          </button>
-        `).join("")}
+            <i data-lucide="${icon}"></i>
+          </button>`;
+        }).join("")}
       </div>
-      <p class="representative-note"><i data-lucide="layers-3"></i> Current lane: ${state.masterPlanning?.enabled ? "03 Master Planning feeds APS/DS" : "APS/DS only"}. You can change this later.</p>
+      <p class="representative-note"><i data-lucide="layers-3"></i> Current lane: ${state.masterPlanning?.enabled ? "03 Master Planning → " : ""}APS/DS${state.dispatch?.enabled ? " → Dispatching & execution" : ""}. You can change this later.</p>
     `,
     attach: (root) => {
       root.querySelectorAll("[data-scope]").forEach((button) => button.addEventListener("click", (event) => {
@@ -593,6 +698,11 @@ const steps = [
       root.querySelector("[data-master-toggle]")?.addEventListener("click", () => {
         state.masterPlanning.enabled = !state.masterPlanning.enabled;
         state.masterPlanning.reviewed = false;
+        render();
+      });
+      root.querySelector("[data-dispatch-toggle]")?.addEventListener("click", () => {
+        state.dispatch.enabled = !state.dispatch.enabled;
+        state.dispatch.reviewed = false;
         render();
       });
     },
@@ -932,6 +1042,54 @@ const steps = [
       </div>
     `,
     attach: (root) => bindChoices(root, (v) => { state.migration = v === "yes"; render(); }),
+  },
+  {
+    id: "architecture", phase: "Architecture", nav: "System topology",
+    title: "Map the system architecture.",
+    sub: "The connections layer as a live diagram: where planning sits between the ERP source and shop-floor execution. Click a node to configure it, then confirm. This diagram becomes the architecture page of the blueprint.",
+    hint: "Confirm every system node to continue.",
+    gate: () => architectureConfigured(),
+    body: () => archCanvasMarkup(),
+    attach: (root) => {
+      if (!state.architecture) state.architecture = { nodes: architectureSeed(), selected: null, reviewed: false };
+      if (!state.architecture.nodes?.length) state.architecture.nodes = architectureSeed();
+      if (!state.architecture.selected) state.architecture.selected = state.architecture.nodes[0].id;
+      const nodes = state.architecture.nodes;
+      const selected = () => nodes.find((n) => n.id === state.architecture.selected);
+      root.querySelectorAll("[data-arch-node]").forEach((b) => b.addEventListener("click", () => {
+        state.architecture.selected = b.dataset.archNode;
+        render();
+      }));
+      const name = root.querySelector("#archName");
+      name?.addEventListener("input", () => {
+        const n = selected();
+        if (!n) return;
+        n.name = name.value;
+        const label = root.querySelector(`[data-arch-node="${n.id}"] strong`);
+        if (label) label.textContent = name.value;
+        save();
+      });
+      root.querySelector("[data-arch-confirm]")?.addEventListener("click", (event) => {
+        const n = nodes.find((x) => x.id === event.currentTarget.dataset.archConfirm);
+        if (n) n.status = n.status === "confirmed" ? "draft" : "confirmed";
+        render();
+      });
+      root.querySelector("[data-arch-confirm-all]")?.addEventListener("click", () => {
+        nodes.forEach((n) => { n.status = "confirmed"; });
+        render();
+      });
+      root.querySelector("[data-arch-del]")?.addEventListener("click", (event) => {
+        state.architecture.nodes = nodes.filter((x) => x.id !== event.currentTarget.dataset.archDel);
+        state.architecture.selected = state.architecture.nodes[0]?.id || null;
+        render();
+      });
+      root.querySelector("[data-arch-add]")?.addEventListener("click", () => {
+        const id = "sys-" + Math.random().toString(36).slice(2, 7);
+        nodes.push({ id, layer: "analytics", name: "BI / Analytics", status: "draft" });
+        state.architecture.selected = id;
+        render();
+      });
+    },
   },
   {
     id: "calendar-gantt-intro", phase: () => organizationTerm(), nav: "Capacity basics",
@@ -1500,7 +1658,122 @@ const steps = [
     `,
   },
   {
-    id: "execution", phase: "Model", nav: "Execution feedback",
+    id: "dispatch-purpose", phase: "Dispatch & Execute", nav: "Dispatch intent",
+    title: "How should APS/DS hand work down to the floor?",
+    sub: "Between the detailed schedule and the shop floor sits a dispatching layer. It decides what each resource runs next and how tightly the floor follows the plan.",
+    hint: "Choose whether a dispatching layer is in scope. If it is, set its objective, grain, and inputs.",
+    gate: () => !state.dispatch?.enabled ? !!state.dispatch?.reviewed : !!(state.dispatch.objective && state.dispatch.granularity && state.dispatch.inputs?.length),
+    body: () => {
+      const d = state.dispatch || initialState.dispatch;
+      const multi = (items, selected, attr) => items.map((item) => choiceTile(item.id, selected.includes(item.id), item.icon, item.name, item.note).replace("data-choice", attr)).join("");
+      return `
+        <div class="master-toggle">
+          <button type="button" class="${d.enabled ? "active" : ""}" data-dispatch-enabled="true" aria-pressed="${d.enabled}"><i data-lucide="list-ordered"></i><span><strong>Dispatching layer in scope</strong><small>Control how the schedule reaches the floor</small></span></button>
+          <button type="button" class="${!d.enabled && d.reviewed ? "active" : ""}" data-dispatch-enabled="false" aria-pressed="${!d.enabled && d.reviewed}"><i data-lucide="circle-slash-2"></i><span><strong>Release directly</strong><small>APS/DS or MES releases work without a separate layer</small></span></button>
+        </div>
+        ${d.enabled ? `
+          <div class="master-profile">
+            <section class="bom-dimension">
+              <h3>Dispatch objective</h3>
+              <div class="choice-grid three compact" data-dispatch-single="objective">
+                ${dispatchObjectives.map((item) => choiceTile(item.id, d.objective === item.id, item.icon, item.name, item.note)).join("")}
+              </div>
+            </section>
+            <section class="bom-dimension">
+              <h3>Dispatch grain</h3>
+              <div class="choice-grid two compact" data-dispatch-single="granularity">
+                ${dispatchGranularities.map((item) => choiceTile(item.id, d.granularity === item.id, item.icon, item.name, item.note)).join("")}
+              </div>
+            </section>
+            <section class="bom-dimension">
+              <h3>Inputs from APS/DS and the floor</h3>
+              <div class="choice-grid three compact">
+                ${multi(dispatchInputs, d.inputs, "data-dispatch-input")}
+              </div>
+            </section>
+          </div>` : `<p class="representative-note"><i data-lucide="info"></i> No separate dispatching layer. APS/DS (or MES) releases firmed orders straight to the floor in planned sequence.</p>`}
+      `;
+    },
+    attach: (root) => {
+      root.querySelectorAll("[data-dispatch-enabled]").forEach((button) => button.addEventListener("click", () => {
+        state.dispatch.enabled = button.dataset.dispatchEnabled === "true";
+        state.dispatch.reviewed = !state.dispatch.enabled;
+        render();
+      }));
+      root.querySelectorAll("[data-dispatch-single]").forEach((group) => group.querySelectorAll("[data-choice]").forEach((button) => button.addEventListener("click", () => {
+        state.dispatch[group.dataset.dispatchSingle] = button.dataset.choice;
+        state.dispatch.reviewed = false;
+        render();
+      })));
+      root.querySelectorAll("[data-dispatch-input]").forEach((button) => button.addEventListener("click", () => {
+        state.dispatch.inputs = toggle(state.dispatch.inputs, button.dataset.dispatchInput);
+        state.dispatch.reviewed = false;
+        render();
+      }));
+    },
+  },
+  {
+    id: "dispatch-control", phase: "Dispatch & Execute", nav: "Dispatch rules",
+    title: "What governs the dispatch list?",
+    sub: "These rules decide how work is released, re-ranked, and delivered to operators — and how fast dispatch reacts when the floor deviates from plan.",
+    hint: "Select dispatch policies, delivery channels, reactivity, then confirm the layer.",
+    gate: () => !state.dispatch?.enabled || !!(state.dispatch.policies?.length && state.dispatch.channels?.length && state.dispatch.reactivity && state.dispatch.reviewed),
+    body: () => {
+      const d = state.dispatch || initialState.dispatch;
+      if (!d.enabled) return `<div class="master-skip"><i data-lucide="circle-slash-2"></i><strong>No separate dispatching layer.</strong><p>Continue to the execution feedback contract.</p></div>`;
+      const multi = (items, selected, attr) => items.map((item) => choiceTile(item.id, selected.includes(item.id), item.icon, item.name, item.note).replace("data-choice", attr)).join("");
+      return `
+        ${dispatchBoard()}
+        <div class="master-profile">
+          <section class="bom-dimension">
+            <h3>Dispatch policies</h3>
+            <div class="choice-grid three compact">
+              ${multi(dispatchPolicies, d.policies, "data-dispatch-policy")}
+            </div>
+          </section>
+          <section class="bom-dimension">
+            <h3>Delivery channels</h3>
+            <div class="choice-grid three compact">
+              ${multi(dispatchChannels, d.channels, "data-dispatch-channel")}
+            </div>
+          </section>
+          <section class="bom-dimension">
+            <h3>Reactivity to disruption</h3>
+            <div class="choice-grid three compact" data-dispatch-single="reactivity">
+              ${dispatchReactivities.map((item) => choiceTile(item.id, d.reactivity === item.id, item.icon, item.name, item.note)).join("")}
+            </div>
+          </section>
+        </div>
+        <div class="volume-confirmation">
+          <div><i data-lucide="info"></i><p><strong>Dispatching sequences, it does not replan.</strong> APS/DS still owns finite timing and feasibility; execution feedback (next) closes the loop back to planning.</p></div>
+          <button type="button" class="${d.reviewed ? "active" : ""}" id="confirmDispatch" ${d.policies.length && d.channels.length && d.reactivity ? "" : "disabled"}><i data-lucide="${d.reviewed ? "circle-check" : "shield-check"}"></i><span>${d.reviewed ? "Dispatching layer confirmed" : "Confirm dispatching layer"}</span></button>
+        </div>
+      `;
+    },
+    attach: (root) => {
+      root.querySelectorAll("[data-dispatch-policy]").forEach((button) => button.addEventListener("click", () => {
+        state.dispatch.policies = toggle(state.dispatch.policies, button.dataset.dispatchPolicy);
+        state.dispatch.reviewed = false;
+        render();
+      }));
+      root.querySelectorAll("[data-dispatch-channel]").forEach((button) => button.addEventListener("click", () => {
+        state.dispatch.channels = toggle(state.dispatch.channels, button.dataset.dispatchChannel);
+        state.dispatch.reviewed = false;
+        render();
+      }));
+      root.querySelectorAll("[data-dispatch-single]").forEach((group) => group.querySelectorAll("[data-choice]").forEach((button) => button.addEventListener("click", () => {
+        state.dispatch[group.dataset.dispatchSingle] = button.dataset.choice;
+        state.dispatch.reviewed = false;
+        render();
+      })));
+      root.querySelector("#confirmDispatch")?.addEventListener("click", () => {
+        state.dispatch.reviewed = true;
+        render();
+      });
+    },
+  },
+  {
+    id: "execution", phase: "Dispatch & Execute", nav: "Execution feedback",
     title: "How does actual execution return to planning?",
     sub: () => `Configure the feedback contract separately from the ${profile().route.toLowerCase()}. MES events and ${profile().badge} confirmations may describe the same work at different levels and times.`,
     hint: "Complete the source, reporting level, event, and quantity configuration.",
@@ -1583,7 +1856,7 @@ const steps = [
     },
   },
   {
-    id: "variant", phase: "Model", nav: "Try a variant",
+    id: "variant", phase: "Validate", nav: "Try a variant",
     title: "Want to try a variant before committing?",
     sub: "Branching lets you explore a taxonomy change in isolation. The example uses synthetic Packaging and Finished-Goods records, never customer master data.",
     hint: "Try it or skip to continue.",
@@ -1789,6 +2062,11 @@ const [industryStep] = steps.splice(industryStepIndex, 1);
 steps.splice(archetypeStepIndex, 0, industryStep);
 
 // ── Step UI helpers ──────────────────────────────────────────────────
+function toggle(arr, value) {
+  const set = new Set(arr || []);
+  set.has(value) ? set.delete(value) : set.add(value);
+  return [...set];
+}
 function choiceTile(value, active, icon, title, sub) {
   return `
     <button class="choice${active ? " active" : ""}" type="button" data-choice="${escapeHtml(value)}">

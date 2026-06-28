@@ -460,6 +460,54 @@ const masterHandoffOutputs = [
   { id: "aps-release", icon: "send", name: "APS release package", note: "Firmed supply horizon handed to detailed scheduling" },
 ];
 
+// Dispatching / execution. The downstream counterpart to Master Planning:
+// where Master Planning shapes what enters APS/DS, dispatching shapes how the
+// APS/DS schedule is released to the floor and how tightly the floor follows it.
+const dispatchObjectives = [
+  { id: "sequence-adherence", icon: "list-ordered", name: "Sequence adherence", note: "Run the APS/DS sequence as planned, minimize deviation" },
+  { id: "due-date", icon: "calendar-clock", name: "Due-date protection", note: "Re-rank to protect late, at-risk, or promised orders" },
+  { id: "flow-wip", icon: "git-commit-horizontal", name: "Flow / WIP control", note: "Release to cap WIP and avoid starving the constraint (pull / CONWIP)" },
+  { id: "changeover-min", icon: "repeat", name: "Changeover protection", note: "Group like work to preserve a favorable setup or clean state" },
+  { id: "utilization", icon: "gauge", name: "Constraint utilization", note: "Keep the bottleneck fed so it is never idle" },
+];
+
+const dispatchGranularities = [
+  { id: "resource-queue", icon: "list-checks", name: "Resource dispatch list", note: "Ordered queue of jobs per work center, line, or cell" },
+  { id: "operation", icon: "wrench", name: "Operation / step", note: "Each routing operation released and confirmed individually" },
+  { id: "order", icon: "clipboard-list", name: "Whole order / batch", note: "Order released and run as one unit on the floor" },
+  { id: "campaign", icon: "layers-3", name: "Campaign / wheel", note: "Pre-sequenced campaign block dispatched together" },
+];
+
+const dispatchInputs = [
+  { id: "released-orders", icon: "send", name: "Released orders", note: "Firmed supply handed down by APS/DS" },
+  { id: "sequence", icon: "list-ordered", name: "Planned sequence", note: "Resource-level order and timing from the schedule" },
+  { id: "material-status", icon: "package-check", name: "Material readiness", note: "Real component, ingredient, or lot availability gates starts" },
+  { id: "resource-status", icon: "activity", name: "Resource status", note: "Up / down / setup state of machines and lines" },
+  { id: "labor-availability", icon: "users", name: "Labor on shift", note: "Who is actually present and qualified right now" },
+];
+
+const dispatchPolicies = [
+  { id: "release-fence", icon: "lock", name: "Release fence / horizon", note: "How far ahead work is released to the floor" },
+  { id: "priority-rule", icon: "list-filter", name: "Priority rule", note: "FIFO, EDD, critical ratio, slack, or custom ranking" },
+  { id: "reprioritize", icon: "refresh-cw", name: "Live reprioritization", note: "Re-rank the queue as status and demand change" },
+  { id: "setup-protect", icon: "shield", name: "Setup / state protection", note: "Avoid breaking a favorable changeover or clean state" },
+  { id: "manual-override", icon: "hand", name: "Supervisor override", note: "Floor can pin, hold, or resequence within the rules" },
+];
+
+const dispatchChannels = [
+  { id: "mes-terminal", icon: "monitor-cog", name: "MES / shop-floor terminal", note: "Dispatch list shown and confirmed in MES" },
+  { id: "andon", icon: "siren", name: "Andon / signal board", note: "Visual call and status signaling at the line" },
+  { id: "paper-traveler", icon: "file-text", name: "Paper / traveler", note: "Printed dispatch list or routing traveler" },
+  { id: "mobile", icon: "smartphone", name: "Mobile / handheld", note: "Operators receive and confirm on mobile devices" },
+  { id: "plc-direct", icon: "cpu", name: "Direct to equipment", note: "Orders downloaded straight to PLC or line control" },
+];
+
+const dispatchReactivities = [
+  { id: "static", icon: "pin", name: "Static dispatch list", note: "Frozen at release; refreshed only on the next APS/DS run" },
+  { id: "event-driven", icon: "zap", name: "Event-driven reorder", note: "Queue re-ranks on breakdowns, rush orders, or shortages" },
+  { id: "continuous", icon: "infinity", name: "Continuous / real-time", note: "Closed-loop reoptimization as the floor reports status" },
+];
+
 // Setup / changeover / cleaning transitions. The time the line loses between
 // runs is its own model: what kind of transition, what inserts it, whether it
 // blocks the resource, and what it is keyed to. APS schedules around these.

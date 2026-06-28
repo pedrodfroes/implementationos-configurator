@@ -24,6 +24,7 @@ const initialState = {
   },
   industryFirst: true,
   archetypes: [],
+  architecture: { nodes: [], selected: null, reviewed: false },
   industry: null,
   industrySpecialty: null,
   industryContexts: [],
@@ -66,6 +67,16 @@ const initialState = {
   volumeStorage: { present: null, behaviors: [], confirmed: false },
   supplies: { policies: {}, confirmed: false },
   workforce: { scopes: {}, confirmed: false },
+  dispatch: {
+    enabled: false,
+    reviewed: false,
+    objective: null,
+    granularity: null,
+    inputs: [],
+    policies: [],
+    channels: [],
+    reactivity: null,
+  },
   execution: {
     source: null,
     levels: [],
@@ -75,6 +86,8 @@ const initialState = {
   },
   variant: null, // null | "active" | "kept" | "reverted" | "skipped"
   exportFormat: "generic", // "generic" | "opcenter"
+  blueprintOpen: true, // live blueprint drawer visibility (UI pref, not a step)
+  view: "flow", // "flow" (linear step) | "cockpit" (module hub overview)
   done: false,
 };
 
@@ -157,6 +170,22 @@ function load() {
         const mpIdx = steps.findIndex((step) => step.id === "master-purpose");
         if (mpIdx >= 0 && Number(saved.i || 0) >= mpIdx) state.i = Number(saved.i) + 3;
         if (mpIdx >= 0 && Number(saved.max || 0) >= mpIdx) state.max = Number(saved.max) + 3;
+      }
+      if (!("architecture" in saved)) {
+        // One System-topology step was inserted after the migration step.
+        state.architecture = clone(initialState.architecture);
+        const aIdx = steps.findIndex((step) => step.id === "architecture");
+        if (aIdx >= 0 && Number(saved.i || 0) >= aIdx) state.i = Number(state.i) + 1;
+        if (aIdx >= 0 && Number(saved.max || 0) >= aIdx) state.max = Number(state.max) + 1;
+      }
+      if (!("dispatch" in saved)) {
+        // Two dispatch steps were inserted just before the execution step.
+        // Shift cumulatively (state.i, not saved.i) so this composes with the
+        // master-planning shift above for sessions that predate both.
+        state.dispatch = clone(initialState.dispatch);
+        const dpIdx = steps.findIndex((step) => step.id === "dispatch-purpose");
+        if (dpIdx >= 0 && Number(saved.i || 0) >= dpIdx) state.i = Number(state.i) + 2;
+        if (dpIdx >= 0 && Number(saved.max || 0) >= dpIdx) state.max = Number(state.max) + 2;
       }
       delete state.planningMode;
       delete state.archetype;
