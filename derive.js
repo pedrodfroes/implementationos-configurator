@@ -92,6 +92,13 @@ function dispatchSummary() {
   const grain = dispatchGranularities.find((item) => item.id === d.granularity)?.name || "grain pending";
   return `${objective} · ${grain}`;
 }
+function capabilityStackLabel() {
+  const pieces = [];
+  if (state.masterPlanning?.enabled) pieces.push("03 Master Planning");
+  pieces.push(state.scope === "aps-ds" ? "Detailed planning & scheduling" : "Shared configuration backbone");
+  if (state.dispatch?.enabled) pieces.push("Dispatching & execution");
+  return pieces.join(" -> ");
+}
 function selectedDepartmentTypes() { return departmentTaxonomy.filter((item) => state.departmentTypes?.includes(item.id)); }
 function selectedResourceTypes() { return resourceTaxonomy.filter((item) => state.resourceTypes?.includes(item.id)); }
 function attributeProfile() {
@@ -199,8 +206,7 @@ function blueprintModel() {
   const out = [];
   const push = (label, status, detail) => { if (status) out.push({ label, status, detail: detail || "" }); };
 
-  const lane = `${s.masterPlanning?.enabled ? "Master Planning → " : ""}APS/DS${s.dispatch?.enabled ? " → Dispatching" : ""}`;
-  push("Solution lane", s.scope ? "confirmed" : null, lane);
+  push("Capability scope", s.scope || s.masterPlanning?.enabled || s.dispatch?.enabled ? "confirmed" : null, capabilityStackLabel());
 
   if (s.masterPlanning?.enabled) push("Master Planning", masterPlanningConfigured() ? "confirmed" : "draft", masterPlanningSummary());
   else if (s.masterPlanning?.reviewed) push("Master Planning", "confirmed", "Out of scope");
@@ -287,8 +293,7 @@ function moduleModel() {
   });
 }
 
-// System architecture canvas (direction D / E step 3). The structural
-// connections layer modeled as a small topology: ERP source → APS planning →
+// connections layer modeled as a small topology: ERP source -> planning core ->
 // MES/MOM execution → shop floor, plus optional satellite systems. Each node
 // carries its own draft → confirmed state and the diagram becomes the
 // architecture page of the blueprint.
@@ -296,7 +301,7 @@ const ARCH_SPINE = ["source", "planning", "execution", "shopfloor"];
 
 function architectureSeed() {
   const erp = profile().badge;
-  const aps = { generic: "APS / DS", opcenter: "Opcenter APS", planettogether: "PlanetTogether" }[state.exportFormat] || "APS / DS";
+  const aps = { generic: "Planning / scheduling core", opcenter: "Opcenter APS", planettogether: "PlanetTogether" }[state.exportFormat] || "Planning / scheduling core";
   const mes = { mes: "MES", hybrid: "MES + ERP", erp: "ERP confirmations" }[state.execution?.source] || "MES / MOM";
   return [
     { id: "erp", layer: "source", name: erp, status: "draft" },

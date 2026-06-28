@@ -206,7 +206,7 @@ const resourceTaxonomy = [
 ];
 
 // Tanks, silos, vats, drums, bins, and connected buffers are schedule-dependent
-// volume resources — not warehouses or ordinary machines. Each behavior an APS
+// volume resources — not warehouses or ordinary machines. Each behavior a planning engine
 // model may need to represent is its own selectable card in the volume step.
 const volumeStorageBehaviors = [
   { id: "dynamic-hold", icon: "pause", name: "Independent inflow, hold, and outflow", note: "Storage duration is schedule-dependent; feeding and consuming operations have independent timing and rates." },
@@ -265,7 +265,7 @@ const attributeProfiles = {
   },
 };
 
-// Universal attribute families an APS model must understand, each rendered in
+// Universal attribute families a planning model must understand, each rendered in
 // the ERP's own words via `attributeProfiles`. Each is its own Model step.
 const attributeConcepts = [
   { id: "classification", dialectKey: "classification", icon: "tags", short: "Classification", name: "Classification & grouping", role: "Group products into classes or categories.", aps: "Drives changeover families, campaign grouping, and reporting dimensions." },
@@ -394,7 +394,7 @@ const planningLevels = [
   { id: "master", level: "Master planning", horizon: "3–18 months", question: "What finished goods should we plan to make by period?", terms: "MPS · RCCP · master scheduling" },
   { id: "material", level: "Material planning", horizon: "Weeks–months", question: "What materials and components are needed, and when?", terms: "MRP · DRP · procurement planning" },
   { id: "capacity", level: "Capacity planning", horizon: "Weeks–months", question: "Do we have enough labor, machines, tools, and suppliers?", terms: "CRP · RCCP · infinite / finite capacity" },
-  { id: "aps-ds", level: "Advanced Planning & Detailed Scheduling", horizon: "Hours–weeks", question: "Which operation runs where, when, and in what sequence?", terms: "APS · DS · FCS · finite scheduling", available: true },
+  { id: "aps-ds", level: "Detailed Planning & Scheduling", horizon: "Hours–weeks", question: "Which operation runs where, when, and in what sequence?", terms: "DS · FCS · finite scheduling", available: true },
   { id: "dispatch", level: "Dispatching / execution", horizon: "Now–days", question: "What should the shop floor do next?", terms: "Dispatch list · MES · shop-floor control" },
   { id: "monitoring", level: "Monitoring / control", horizon: "Real time–days", question: "Are we late, blocked, starved, overloaded, or deviating?", terms: "WIP control · ATP / CTP · exception management" },
 ];
@@ -448,7 +448,7 @@ const masterCapacityBuckets = [
 
 const masterRunBehaviors = [
   { id: "infinite-exceptions", icon: "alert-triangle", name: "Infinite with exceptions", note: "Plan freely, then show overloads and shortages" },
-  { id: "finite-buckets", icon: "gauge", name: "Finite by bucket", note: "Constrain selected buckets before APS/DS receives orders" },
+  { id: "finite-buckets", icon: "gauge", name: "Finite by bucket", note: "Constrain selected buckets before downstream planning receives orders" },
   { id: "scenario-comparison", icon: "copy", name: "Scenario comparison", note: "Compare demand, supply, inventory, and capacity assumptions" },
 ];
 
@@ -457,14 +457,14 @@ const masterHandoffOutputs = [
   { id: "pegging", icon: "network", name: "Demand-supply pegging", note: "Why each order exists and which demand it protects" },
   { id: "capacity-overloads", icon: "activity", name: "Bucket overloads", note: "Rough-cut constraints to respect or escalate" },
   { id: "inventory-projection", icon: "area-chart", name: "Projected inventory", note: "Period-end stock, cover, expiry, and shortage risk" },
-  { id: "aps-release", icon: "send", name: "APS release package", note: "Firmed supply horizon handed to detailed scheduling" },
+  { id: "aps-release", icon: "send", name: "Downstream release package", note: "Firmed supply horizon handed to the next planning layer" },
 ];
 
 // Dispatching / execution. The downstream counterpart to Master Planning:
-// where Master Planning shapes what enters APS/DS, dispatching shapes how the
-// APS/DS schedule is released to the floor and how tightly the floor follows it.
+// where Master Planning shapes what enters the planning layer, dispatching shapes how the
+// planned schedule is released to the floor and how tightly the floor follows it.
 const dispatchObjectives = [
-  { id: "sequence-adherence", icon: "list-ordered", name: "Sequence adherence", note: "Run the APS/DS sequence as planned, minimize deviation" },
+  { id: "sequence-adherence", icon: "list-ordered", name: "Sequence adherence", note: "Run the planned sequence as agreed, minimize deviation" },
   { id: "due-date", icon: "calendar-clock", name: "Due-date protection", note: "Re-rank to protect late, at-risk, or promised orders" },
   { id: "flow-wip", icon: "git-commit-horizontal", name: "Flow / WIP control", note: "Release to cap WIP and avoid starving the constraint (pull / CONWIP)" },
   { id: "changeover-min", icon: "repeat", name: "Changeover protection", note: "Group like work to preserve a favorable setup or clean state" },
@@ -479,7 +479,7 @@ const dispatchGranularities = [
 ];
 
 const dispatchInputs = [
-  { id: "released-orders", icon: "send", name: "Released orders", note: "Firmed supply handed down by APS/DS" },
+  { id: "released-orders", icon: "send", name: "Released orders", note: "Firmed supply handed down by the planning layer" },
   { id: "sequence", icon: "list-ordered", name: "Planned sequence", note: "Resource-level order and timing from the schedule" },
   { id: "material-status", icon: "package-check", name: "Material readiness", note: "Real component, ingredient, or lot availability gates starts" },
   { id: "resource-status", icon: "activity", name: "Resource status", note: "Up / down / setup state of machines and lines" },
@@ -503,14 +503,14 @@ const dispatchChannels = [
 ];
 
 const dispatchReactivities = [
-  { id: "static", icon: "pin", name: "Static dispatch list", note: "Frozen at release; refreshed only on the next APS/DS run" },
+  { id: "static", icon: "pin", name: "Static dispatch list", note: "Frozen at release; refreshed only on the next planning run" },
   { id: "event-driven", icon: "zap", name: "Event-driven reorder", note: "Queue re-ranks on breakdowns, rush orders, or shortages" },
   { id: "continuous", icon: "infinity", name: "Continuous / real-time", note: "Closed-loop reoptimization as the floor reports status" },
 ];
 
 // Setup / changeover / cleaning transitions. The time the line loses between
 // runs is its own model: what kind of transition, what inserts it, whether it
-// blocks the resource, and what it is keyed to. APS schedules around these.
+// blocks the resource, and what it is keyed to. The planning layer schedules around these.
 const transitionTypes = [
   { id: "setup", icon: "wrench", name: "Setup", note: "Prepare or configure equipment before a run begins" },
   { id: "changeover", icon: "repeat", name: "Changeover", note: "Switch the line from one product to another" },
