@@ -96,7 +96,7 @@ function renderBlueprint() {
       <span class="bp-live"><i data-lucide="circle-dot"></i>SME · live</span>
     </div>
     <div class="bp-doc">
-      <div class="bp-doc-top"><span class="bp-doc-title">APS pilot</span><span class="bp-ver">v0.${bp.confirmed} draft</span></div>
+      <div class="bp-doc-top"><span class="bp-doc-title">Implementation blueprint</span><span class="bp-ver">v0.${bp.confirmed} draft</span></div>
       ${bp.sections.length ? sections : `<p class="bp-empty">The blueprint fills in here as you make decisions — confirmed sections settle in green, drafts stay flagged until the SME signs off.</p>`}
       <div class="bp-foot">
         <span><b class="bp-c">${bp.confirmed} confirmed</b> · <b class="bp-d">${bp.draft} draft</b></span>
@@ -208,7 +208,7 @@ function advance() {
 
 function exportBrief() {
   const brief = {
-    product: "ImplementationOS for Manufacturing Software",
+    product: "ImplementationOS for Manufacturing Planning and Execution",
     planningObjective: planningLevels.find((item) => item.id === state.scope) || null,
     masterPlanning: {
       ...state.masterPlanning,
