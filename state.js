@@ -1,0 +1,214 @@
+// ImplementationOS — UI state and persistence.
+//
+// The semantic graph (model.js) is the source of truth for the model itself;
+// this `state` only tracks where the user is in the installer and which
+// answers they've given. Persisted to localStorage under a versioned key so a
+// shape change can discard stale state cleanly. Depends on data.js for
+// `attributeConcepts` and util.js for `clone`.
+
+const initialState = {
+  i: 0,
+  max: 0,
+  scope: null,
+  masterPlanning: {
+    enabled: false,
+    reviewed: false,
+    objective: null,
+    grain: null,
+    demand: [],
+    supply: [],
+    policy: [],
+    capacity: [],
+    run: null,
+    handoff: [],
+  },
+  industryFirst: true,
+  archetypes: [],
+  architecture: { nodes: [], selected: null, reviewed: false },
+  industry: null,
+  industrySpecialty: null,
+  industryContexts: [],
+  erp: "sap_pi",
+  migration: null,
+  calendar: {
+    layering: null,
+    pattern: null,
+    exceptions: null,
+    modifiers: [],
+    modifiersConfirmed: false,
+  },
+  constraint: null,
+  // Migration sentinels: purely-visual Gantt steps were added around the
+  // calendar and bottleneck steps. Each flag's absence in a saved session
+  // triggers the matching index shift.
+  calendarVisuals: true,
+  bottleneckVisuals: true,
+  tankVisuals: true,
+  transitionVisuals: true,
+  workforceVisuals: true,
+  taxonomyMode: "representative",
+  departmentTypes: [],
+  resourceTypes: [],
+  attr: Object.fromEntries(attributeConcepts.map((concept) => [concept.id, { picks: [], confirmed: false }])),
+  transitions: {
+    types: [],
+    triggers: [],
+    concurrency: null,
+    drivers: [],
+    driverAttributes: [],
+  },
+  bom: {
+    structure: null,
+    features: [],
+    featuresConfirmed: false,
+    consumption: null,
+    source: null,
+  },
+  volumeStorage: { present: null, behaviors: [], confirmed: false },
+  supplies: { policies: {}, confirmed: false },
+  workforce: { scopes: {}, confirmed: false },
+  dispatch: {
+    enabled: false,
+    reviewed: false,
+    objective: null,
+    granularity: null,
+    inputs: [],
+    policies: [],
+    channels: [],
+    reactivity: null,
+  },
+  execution: {
+    source: null,
+    levels: [],
+    events: [],
+    quantities: [],
+    quantitiesConfirmed: false,
+  },
+  variant: null, // null | "active" | "kept" | "reverted" | "skipped"
+  exportFormat: "generic", // "generic" | "opcenter"
+  blueprintOpen: true, // live blueprint drawer visibility (UI pref, not a step)
+  view: "flow", // "flow" (linear step) | "cockpit" (module hub overview)
+  done: false,
+};
+
+let state = clone(initialState);
+const UI_KEY = "implementationos-installer-v2";
+
+function save() {
+  try { localStorage.setItem(UI_KEY, JSON.stringify(state)); } catch {}
+}
+function load() {
+  try {
+    const raw = localStorage.getItem(UI_KEY);
+    if (raw) {
+      const saved = JSON.parse(raw);
+      state = { ...clone(initialState), ...saved };
+      if (!Array.isArray(saved.industryContexts) && saved.industry && saved.industrySpecialty) {
+        state.industryContexts = [{ industry: saved.industry, specialty: saved.industrySpecialty }];
+      }
+      if (!("supplies" in saved) && Number(saved.max || 0) >= 11) {
+        state.i = 11;
+        state.max = Math.max(11, Number(state.max || 0) + 1);
+      }
+      if (!("workforce" in saved)) {
+        const wfIdx = steps.findIndex((step) => step.id === "workforce");
+        if (wfIdx >= 0 && Number(saved.i || 0) >= wfIdx) state.i = Number(saved.i) + 1;
+        if (wfIdx >= 0 && Number(saved.max || 0) >= wfIdx) state.max = Number(saved.max) + 1;
+      }
+      if (!("volumeStorage" in saved)) {
+        const vsIdx = steps.findIndex((step) => step.id === "volume-storage");
+        if (vsIdx >= 0 && Number(saved.i || 0) >= vsIdx) state.i = Number(saved.i) + 1;
+        if (vsIdx >= 0 && Number(saved.max || 0) >= vsIdx) state.max = Number(saved.max) + 1;
+      }
+      if (!("calendarVisuals" in saved)) {
+        // Two visual steps were inserted around the calendar step; shift the
+        // saved position past each one it already sits at or beyond.
+        ["calendar-gantt-intro", "calendar-gantt-preview"].forEach((id) => {
+          const idx = steps.findIndex((step) => step.id === id);
+          if (idx >= 0 && Number(state.i) >= idx) state.i = Number(state.i) + 1;
+          if (idx >= 0 && Number(state.max) >= idx) state.max = Number(state.max) + 1;
+        });
+      }
+      if (!("bottleneckVisuals" in saved)) {
+        ["bottleneck-intro", "bottleneck-preview"].forEach((id) => {
+          const idx = steps.findIndex((step) => step.id === id);
+          if (idx >= 0 && Number(state.i) >= idx) state.i = Number(state.i) + 1;
+          if (idx >= 0 && Number(state.max) >= idx) state.max = Number(state.max) + 1;
+        });
+      }
+      if (!("tankVisuals" in saved)) {
+        ["tank-intro", "tank-preview"].forEach((id) => {
+          const idx = steps.findIndex((step) => step.id === id);
+          if (idx >= 0 && Number(state.i) >= idx) state.i = Number(state.i) + 1;
+          if (idx >= 0 && Number(state.max) >= idx) state.max = Number(state.max) + 1;
+        });
+      }
+      if (!("transitionVisuals" in saved)) {
+        ["transition-intro", "transition-preview"].forEach((id) => {
+          const idx = steps.findIndex((step) => step.id === id);
+          if (idx >= 0 && Number(state.i) >= idx) state.i = Number(state.i) + 1;
+          if (idx >= 0 && Number(state.max) >= idx) state.max = Number(state.max) + 1;
+        });
+      }
+      if (!("workforceVisuals" in saved)) {
+        ["workforce-intro", "workforce-preview"].forEach((id) => {
+          const idx = steps.findIndex((step) => step.id === id);
+          if (idx >= 0 && Number(state.i) >= idx) state.i = Number(state.i) + 1;
+          if (idx >= 0 && Number(state.max) >= idx) state.max = Number(state.max) + 1;
+        });
+      }
+      if (!Array.isArray(saved.archetypes) && saved.archetype) state.archetypes = [saved.archetype];
+      if (!("scope" in saved)) {
+        state.i = 1;
+        state.max = Math.max(1, Number(saved.max || 0));
+      } else if ("planningMode" in saved) {
+        if (state.i > 6) state.i -= 1;
+        if (state.max > 6) state.max -= 1;
+      }
+      if (!("masterPlanning" in saved)) {
+        state.masterPlanning = clone(initialState.masterPlanning);
+        const mpIdx = steps.findIndex((step) => step.id === "master-purpose");
+        if (mpIdx >= 0 && Number(saved.i || 0) >= mpIdx) state.i = Number(saved.i) + 3;
+        if (mpIdx >= 0 && Number(saved.max || 0) >= mpIdx) state.max = Number(saved.max) + 3;
+      }
+      if (!("architecture" in saved)) {
+        // One System-topology step was inserted after the migration step.
+        state.architecture = clone(initialState.architecture);
+        const aIdx = steps.findIndex((step) => step.id === "architecture");
+        if (aIdx >= 0 && Number(saved.i || 0) >= aIdx) state.i = Number(state.i) + 1;
+        if (aIdx >= 0 && Number(saved.max || 0) >= aIdx) state.max = Number(state.max) + 1;
+      }
+      if (!("dispatch" in saved)) {
+        // Two dispatch steps were inserted just before the execution step.
+        // Shift cumulatively (state.i, not saved.i) so this composes with the
+        // master-planning shift above for sessions that predate both.
+        state.dispatch = clone(initialState.dispatch);
+        const dpIdx = steps.findIndex((step) => step.id === "dispatch-purpose");
+        if (dpIdx >= 0 && Number(saved.i || 0) >= dpIdx) state.i = Number(state.i) + 2;
+        if (dpIdx >= 0 && Number(saved.max || 0) >= dpIdx) state.max = Number(state.max) + 2;
+      }
+      delete state.planningMode;
+      delete state.archetype;
+      if (!("industry" in saved) && Number(saved.max || 0) >= 2) {
+        state.i = 3;
+        state.max = Math.max(3, state.max + 1);
+      }
+      if (!("execution" in saved) && Number(saved.max || 0) >= 11) {
+        state.i = 12;
+        state.max = Math.max(12, state.max + 1);
+      }
+      if (!("taxonomyMode" in saved)) {
+        if (state.i > 6) state.i -= 1;
+        if (state.max > 6) state.max -= 1;
+        if (Number(saved.max || 0) >= 9) state.i = 8;
+        state.departmentTypes = [];
+        state.resourceTypes = [];
+      }
+      if (!("industryFirst" in saved)) {
+        state.i = 2;
+        state.archetypes = state.archetypes.filter((id) => industryArchetypeCompatibility[state.industry]?.includes(id));
+      }
+      delete state.lineDecision;
+    }
+  } catch { state = clone(initialState); }
+}

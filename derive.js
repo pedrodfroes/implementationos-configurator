@@ -1,0 +1,338 @@
+// ImplementationOS — derived helpers.
+//
+// Read-only getters over `state` + the reference data. They resolve the live
+// ERP dialect, synthesize the operating mode from the selected archetypes, and
+// compute readiness. Depends on data.js and state.js.
+
+function profile() { return profiles[state.erp]; }
+function organizationTerm() {
+  const compact = {
+    oracle: "Inventory Organization",
+    peoplesoft: "Manufacturing BU",
+    epicor: "Site / Plant",
+  };
+  return compact[state.erp] || profile().facility;
+}
+function calendarProfile() {
+  if (["sap_pp", "sap_pi", "s4"].includes(state.erp)) return calendarProfiles.sap;
+  return calendarProfiles[state.erp] || calendarProfiles.generic;
+}
+function selectedArchetypes() {
+  return (state.archetypes || []).map((id) => planningArchetypes.find((item) => item.id === id)).filter(Boolean);
+}
+function industry() { return industries.find((item) => item.id === state.industry) || null; }
+function selectedIndustryContexts() {
+  return (state.industryContexts || []).map((context) => ({ ...context, sector: industries.find((item) => item.id === context.industry) })).filter((context) => context.sector);
+}
+function industryLabel() {
+  const contexts = selectedIndustryContexts();
+  if (contexts.length === 1) return contexts[0].specialty;
+  return contexts.length ? `${contexts.length} industry contexts` : null;
+}
+function industryLens() {
+  return [...new Set(selectedIndustryContexts().map((context) => context.sector.name))].join(" + ");
+}
+function compatibleContextLabels(id) {
+  return selectedIndustryContexts().filter((context) => industryArchetypeCompatibility[context.industry]?.includes(id)).map((context) => context.specialty);
+}
+function isArchetypeCompatible(id) { return compatibleContextLabels(id).length > 0; }
+function supplyProfiles() {
+  const ids = new Set();
+  selectedIndustryContexts().forEach((context) => (industrySupplyProfiles[context.industry] || []).forEach((id) => ids.add(id)));
+  if (!ids.size) ["interplant-transfer", "standard-packaging"].forEach((id) => ids.add(id));
+  return [...ids].map((id) => ({ id, ...supplyProfileCatalog[id] })).filter((item) => item.name);
+}
+function supplyPolicy(profile) { return state.supplies?.policies?.[profile.id] || profile.recommended; }
+function volumeStorageRecommended() {
+  const processSectors = new Set(["food-beverage", "pharma", "chemicals", "metals-mining", "building-materials", "packaging", "energy-services"]);
+  return selectedIndustryContexts().some((context) => processSectors.has(context.industry));
+}
+function laborIntensity() {
+  const rank = { core: 3, supporting: 2, minimal: 1 };
+  let best = 0, label = "supporting";
+  selectedArchetypes().forEach((a) => {
+    const tier = archetypeLaborIntensity[a.id] || "supporting";
+    if (rank[tier] > best) { best = rank[tier]; label = tier; }
+  });
+  return label;
+}
+function workforceScope(cap) {
+  return state.workforce?.scopes?.[cap.id] || workforceScopeMatrix[cap.id]?.[laborIntensity()] || "basic";
+}
+function executionSourceLabel() {
+  return { erp: `${profile().badge} confirmations`, mes: "MES execution events", hybrid: `Hybrid MES + ${profile().badge}` }[state.execution?.source] || "Not configured";
+}
+function masterPlanningEnabled() {
+  return !!state.masterPlanning?.enabled;
+}
+function masterPlanningConfigured() {
+  const mp = state.masterPlanning || {};
+  if (!mp.enabled) return !!mp.reviewed;
+  return !!(mp.objective && mp.grain && mp.demand?.length && mp.supply?.length && mp.policy?.length && mp.capacity?.length && mp.run && mp.handoff?.length && mp.reviewed);
+}
+function masterPlanningSummary() {
+  const mp = state.masterPlanning || {};
+  if (!mp.enabled) return mp.reviewed ? "Not in scope" : "Not reviewed";
+  const objective = masterPlanningObjectives.find((item) => item.id === mp.objective)?.name || "Objective pending";
+  const grain = masterPlanningGrains.find((item) => item.id === mp.grain)?.name || "grain pending";
+  return `${objective} at ${grain}`;
+}
+function dispatchEnabled() {
+  return !!state.dispatch?.enabled;
+}
+function dispatchConfigured() {
+  const d = state.dispatch || {};
+  if (!d.enabled) return !!d.reviewed;
+  return !!(d.objective && d.granularity && d.inputs?.length && d.policies?.length && d.channels?.length && d.reactivity && d.reviewed);
+}
+function dispatchSummary() {
+  const d = state.dispatch || {};
+  if (!d.enabled) return d.reviewed ? "Not in scope" : "Not reviewed";
+  const objective = dispatchObjectives.find((item) => item.id === d.objective)?.name || "Objective pending";
+  const grain = dispatchGranularities.find((item) => item.id === d.granularity)?.name || "grain pending";
+  return `${objective} · ${grain}`;
+}
+function selectedDepartmentTypes() { return departmentTaxonomy.filter((item) => state.departmentTypes?.includes(item.id)); }
+function selectedResourceTypes() { return resourceTaxonomy.filter((item) => state.resourceTypes?.includes(item.id)); }
+function attributeProfile() {
+  if (["sap_pp", "sap_pi", "s4"].includes(state.erp)) return attributeProfiles.sap;
+  if (["oracle", "netsuite", "peoplesoft"].includes(state.erp)) return attributeProfiles.oracle;
+  if (state.erp === "d365") return attributeProfiles.d365;
+  return attributeProfiles.generic;
+}
+function itemTerm() {
+  return { sap_pp: "material", sap_pi: "material", s4: "material", d365: "product", odoo: "product", netsuite: "item" }[state.erp] || "item";
+}
+function qualityLens() {
+  const processMode = modeMix().dominant === "process";
+  const regulatedSectors = ["pharma", "food-beverage", "medical-devices", "chemicals", "pesticides"];
+  const regulated = selectedIndustryContexts().some((context) => regulatedSectors.includes(context.industry));
+  return processMode || regulated;
+}
+// Every attribute the user picked across all families — feeds the transitions
+// step, where setups/cleans can be keyed to those same traits.
+function allSelectedAttributes() {
+  return Object.values(state.attr || {}).flatMap((slot) => slot?.picks || []);
+}
+function transitionsConfigured() {
+  const t = state.transitions;
+  return !!(t && t.types?.length && t.triggers?.length && t.concurrency && t.drivers?.length);
+}
+function representativeData() {
+  const departments = selectedDepartmentTypes().map((item, index) => ({
+    id: `DEPT-${String(index + 1).padStart(3, "0")}`,
+    name: `${item.name} 01`,
+    taxonomyType: item.id,
+    synthetic: true,
+  }));
+  const resources = selectedResourceTypes().map((item, index) => ({
+    id: `RES-${String(index + 1).padStart(3, "0")}`,
+    name: `${item.name} 01`,
+    taxonomyType: item.id,
+    departmentId: departments.find((department) => department.taxonomyType === item.department)?.id || null,
+    relationshipStatus: departments.some((department) => department.taxonomyType === item.department) ? "mapped by taxonomy" : "left unassigned for customer mapping",
+    synthetic: true,
+  }));
+  return {
+    replacementPolicy: "Representative synthetic records; replace with governed customer master data during onboarding.",
+    organization: { id: "ORG-001", name: `Demo ${organizationTerm()} 01`, type: profile().facility, synthetic: true },
+    departments,
+    resources,
+  };
+}
+function modeMix() {
+  const selected = selectedArchetypes();
+  const counts = {};
+  selected.forEach((item) => { counts[item.mode] = (counts[item.mode] || 0) + 1; });
+  let dominant = selected[0]?.mode || "process";
+  selected.forEach((item) => {
+    if ((counts[item.mode] || 0) > (counts[dominant] || 0)) dominant = item.mode;
+  });
+  return { dominant, overlays: Object.keys(counts).filter((key) => key !== dominant), counts };
+}
+function mode() { return modeProfiles[modeMix().dominant]; }
+function archetypeSynthesis() {
+  const selected = selectedArchetypes();
+  const mix = modeMix();
+  if (!selected.length) return { title: "No operating pattern selected", detail: "Choose every pattern that materially shapes planning.", count: 0 };
+  if (selected.length === 1) return { title: selected[0].name, detail: modeProfiles[selected[0].mode].note, count: 1 };
+  const dominant = modeProfiles[mix.dominant].label;
+  const overlays = mix.overlays.map((key) => modeProfiles[key].label).join(", ");
+  return {
+    title: overlays ? `${dominant} backbone with ${overlays} overlay` : `${dominant} composite`,
+    detail: overlays ? `The ${dominant.toLowerCase()} model drives terminology; secondary constraints remain explicit downstream.` : `${selected.length} compatible patterns are synthesized inside one ${dominant.toLowerCase()} model.`,
+    count: selected.length,
+  };
+}
+function readiness() {
+  let s = 16;
+  if (state.scope) s += 12;
+  if (masterPlanningConfigured()) s += state.masterPlanning?.enabled ? 8 : 3;
+  if (state.archetypes?.length) s += 8;
+  if (selectedIndustryContexts().length) s += 6;
+  if (architectureConfigured()) s += 5;
+  if (state.departmentTypes?.length) s += 8;
+  if (state.calendar?.layering && state.calendar?.pattern && state.calendar?.exceptions && state.calendar?.modifiersConfirmed) s += 8;
+  if (state.constraint) s += 6;
+  if (state.resourceTypes?.length) s += 10;
+  if (state.volumeStorage?.present === false || state.volumeStorage?.confirmed) s += 6;
+  const attrConfirmed = Object.values(state.attr || {}).filter((slot) => slot?.confirmed).length;
+  if (attrConfirmed) s += Math.min(10, attrConfirmed * 2);
+  if (transitionsConfigured()) s += 8;
+  if (state.bom?.structure && state.bom?.featuresConfirmed && state.bom?.consumption && state.bom?.source) s += 8;
+  if (state.supplies?.confirmed) s += 6;
+  if (state.workforce?.confirmed) s += 6;
+  if (dispatchConfigured()) s += state.dispatch?.enabled ? 6 : 2;
+  if (state.execution?.source && state.execution?.levels?.length && state.execution?.events?.length && state.execution?.quantitiesConfirmed) s += 8;
+  if (state.variant && state.variant !== "active") s += 6;
+  if (state.migration) s -= 4;
+  return Math.max(5, Math.min(99, Math.round(s)));
+}
+
+// The live blueprint: every decision the consultant has touched, projected as
+// a document section with an honest draft → confirmed state. Sections that use
+// an explicit confirm/review flag report "confirmed" only once that flag is
+// set; otherwise a touched-but-unconfirmed section reads "draft". Untouched
+// decisions are omitted so the document fills in as work happens (direction E).
+function blueprintModel() {
+  const s = state;
+  const out = [];
+  const push = (label, status, detail) => { if (status) out.push({ label, status, detail: detail || "" }); };
+
+  const lane = `${s.masterPlanning?.enabled ? "Master Planning → " : ""}APS/DS${s.dispatch?.enabled ? " → Dispatching" : ""}`;
+  push("Solution lane", s.scope ? "confirmed" : null, lane);
+
+  if (s.masterPlanning?.enabled) push("Master Planning", masterPlanningConfigured() ? "confirmed" : "draft", masterPlanningSummary());
+  else if (s.masterPlanning?.reviewed) push("Master Planning", "confirmed", "Out of scope");
+
+  if (s.dispatch?.enabled) push("Dispatching & execution", dispatchConfigured() ? "confirmed" : "draft", dispatchSummary());
+  else if (s.dispatch?.reviewed) push("Dispatching & execution", "confirmed", "Out of scope");
+
+  push("Operating archetype", s.archetypes?.length ? "confirmed" : null, s.archetypes?.length ? archetypeSynthesis().title : "");
+  push("Industry context", selectedIndustryContexts().length ? "confirmed" : null, selectedIndustryContexts().map((c) => c.specialty).join(" · "));
+
+  const arch = s.architecture?.nodes;
+  if (Array.isArray(arch) && arch.length) push("System architecture", architectureConfigured() ? "confirmed" : "draft",
+    `${arch.length} system${arch.length === 1 ? "" : "s"} mapped`);
+
+  const cal = s.calendar || {};
+  const calConfirmed = cal.layering && cal.pattern && cal.exceptions && cal.modifiersConfirmed;
+  push("Calendars & capacity", calConfirmed ? "confirmed" : cal.layering ? "draft" : null, [calendarProfile()?.base, cal.pattern, cal.exceptions].filter(Boolean).join(" · "));
+
+  push("Bottleneck / CCR", s.constraint ? "confirmed" : null, s.constraint ? String(s.constraint).replace(/-/g, " ") : "");
+  push("Department taxonomy", s.departmentTypes?.length ? "confirmed" : null, s.departmentTypes?.length ? `${s.departmentTypes.length} semantic types` : "");
+  push("Resource taxonomy", s.resourceTypes?.length ? "confirmed" : null, s.resourceTypes?.length ? `${s.resourceTypes.length} capacity-object types` : "");
+
+  if (s.volumeStorage?.present === false) push("Volume storage", "confirmed", "Not in scope");
+  else if (s.volumeStorage?.confirmed) push("Volume storage", "confirmed", `${s.volumeStorage.behaviors.length} tank behaviors`);
+  else if (s.volumeStorage?.present) push("Volume storage", "draft", "Tank behaviors pending");
+
+  const famConfirmed = Object.values(s.attr || {}).filter((c) => c?.confirmed).length;
+  const famTouched = Object.values(s.attr || {}).filter((c) => c?.picks?.length).length;
+  if (famTouched) push("Item attributes", famConfirmed === famTouched ? "confirmed" : "draft", `${famConfirmed} of ${famTouched} famil${famTouched === 1 ? "y" : "ies"} confirmed`);
+
+  const tr = s.transitions || {};
+  const trTouched = tr.types?.length || tr.triggers?.length || tr.drivers?.length;
+  push("Setup & changeovers", transitionsConfigured() ? "confirmed" : trTouched ? "draft" : null, tr.types?.length ? `${tr.types.length} transition type${tr.types.length === 1 ? "" : "s"}` : "Transitions in review");
+
+  const bom = s.bom || {};
+  const bomConfirmed = bom.structure && bom.featuresConfirmed && bom.consumption && bom.source;
+  push("BOM profile", bomConfirmed ? "confirmed" : bom.structure ? "draft" : null, [bom.structure, bom.consumption, bom.source].filter(Boolean).join(" · "));
+
+  push("Critical supplies", s.supplies?.confirmed ? "confirmed" : Object.keys(s.supplies?.policies || {}).length ? "draft" : null,
+    s.supplies?.confirmed ? `${supplyProfiles().filter((p) => supplyPolicy(p) === "hard").length} hard constraints` : "Policy in review");
+  push("Workforce planning", s.workforce?.confirmed ? "confirmed" : Object.keys(s.workforce?.scopes || {}).length ? "draft" : null,
+    s.workforce?.confirmed ? `${workforceCapabilities.filter((c) => workforceScope(c) === "full").length} full-scope capabilities` : "Policy in review");
+
+  const ex = s.execution || {};
+  const exConfirmed = ex.source && ex.levels?.length && ex.events?.length && ex.quantitiesConfirmed;
+  push("Execution feedback", exConfirmed ? "confirmed" : ex.source ? "draft" : null, ex.source ? executionSourceLabel() : "");
+
+  push("Migration risk", s.migration ? "confirmed" : null, s.migration ? "S/4 migration on roadmap" : "");
+  push("Variant decision", s.variant && s.variant !== "active" ? "confirmed" : null, s.variant ? String(s.variant) : "");
+
+  const confirmed = out.filter((x) => x.status === "confirmed").length;
+  const draft = out.filter((x) => x.status === "draft").length;
+  return { sections: out, confirmed, draft };
+}
+
+// The cockpit groups the linear steps into modules by phase. Each module
+// reports a status (done / active / todo) and a screen-completion count, so the
+// consultant can land on a hub and jump to whatever the SME is ready for
+// (direction E). A step counts as satisfied when its gate passes (or it has no
+// gate — intros, previews, the welcome). The linear flow inside a module is
+// unchanged; this is only a map over it.
+function moduleModel() {
+  const order = [];
+  const byPhase = new Map();
+  steps.forEach((step, idx) => {
+    const phase = typeof step.phase === "function" ? step.phase() : step.phase;
+    if (!byPhase.has(phase)) { byPhase.set(phase, []); order.push(phase); }
+    byPhase.get(phase).push(idx);
+  });
+  return order.map((phase) => {
+    const indices = byPhase.get(phase);
+    const firstIndex = indices[0];
+    const lastIndex = indices[indices.length - 1];
+    const reached = firstIndex <= state.max;
+    const passed = indices.filter((i) => {
+      if (i > state.max) return false; // not yet reached — don't count toward progress
+      const step = steps[i];
+      if (!step.gate) return true;
+      try { return !!step.gate(); } catch { return false; }
+    }).length;
+    const total = indices.length;
+    const status = state.done ? "done" : !reached ? "todo" : passed === total ? "done" : "active";
+    return { phase, indices, firstIndex, lastIndex, reached, passed, total, status };
+  });
+}
+
+// System architecture canvas (direction D / E step 3). The structural
+// connections layer modeled as a small topology: ERP source → APS planning →
+// MES/MOM execution → shop floor, plus optional satellite systems. Each node
+// carries its own draft → confirmed state and the diagram becomes the
+// architecture page of the blueprint.
+const ARCH_SPINE = ["source", "planning", "execution", "shopfloor"];
+
+function architectureSeed() {
+  const erp = profile().badge;
+  const aps = { generic: "APS / DS", opcenter: "Opcenter APS", planettogether: "PlanetTogether" }[state.exportFormat] || "APS / DS";
+  const mes = { mes: "MES", hybrid: "MES + ERP", erp: "ERP confirmations" }[state.execution?.source] || "MES / MOM";
+  return [
+    { id: "erp", layer: "source", name: erp, status: "draft" },
+    { id: "aps", layer: "planning", name: aps, status: "draft" },
+    { id: "mes", layer: "execution", name: mes, status: "draft" },
+    { id: "floor", layer: "shopfloor", name: "Lines / SCADA", status: "draft" },
+  ];
+}
+
+function architectureNodes() {
+  const nodes = state.architecture?.nodes;
+  return Array.isArray(nodes) && nodes.length ? nodes : architectureSeed();
+}
+
+function architectureLayout() {
+  const nodes = architectureNodes();
+  const placed = [];
+  let spineY = 26;
+  let satY = 81;
+  nodes.forEach((n) => {
+    if (ARCH_SPINE.includes(n.layer)) { placed.push({ ...n, x: 120, y: spineY }); spineY += 110; }
+    else { placed.push({ ...n, x: 350, y: satY }); satY += 110; }
+  });
+  const spine = placed.filter((n) => ARCH_SPINE.includes(n.layer));
+  const edges = [];
+  for (let i = 0; i < spine.length - 1; i++) {
+    edges.push({ x1: spine[i].x + 75, y1: spine[i].y + 62, x2: spine[i + 1].x + 75, y2: spine[i + 1].y });
+  }
+  const planning = placed.find((n) => n.layer === "planning");
+  placed.filter((n) => !ARCH_SPINE.includes(n.layer)).forEach((n) => {
+    if (planning) edges.push({ x1: planning.x + 150, y1: planning.y + 31, x2: n.x, y2: n.y + 31 });
+  });
+  return { placed, edges, w: 540, h: Math.max(spineY, satY) + 16 };
+}
+
+function architectureConfigured() {
+  const nodes = state.architecture?.nodes;
+  return Array.isArray(nodes) && nodes.length > 0 && nodes.every((n) => n.status === "confirmed");
+}
