@@ -77,6 +77,21 @@ function masterPlanningSummary() {
   const grain = masterPlanningGrains.find((item) => item.id === mp.grain)?.name || "grain pending";
   return `${objective} at ${grain}`;
 }
+function dispatchEnabled() {
+  return !!state.dispatch?.enabled;
+}
+function dispatchConfigured() {
+  const d = state.dispatch || {};
+  if (!d.enabled) return !!d.reviewed;
+  return !!(d.objective && d.granularity && d.inputs?.length && d.policies?.length && d.channels?.length && d.reactivity && d.reviewed);
+}
+function dispatchSummary() {
+  const d = state.dispatch || {};
+  if (!d.enabled) return d.reviewed ? "Not in scope" : "Not reviewed";
+  const objective = dispatchObjectives.find((item) => item.id === d.objective)?.name || "Objective pending";
+  const grain = dispatchGranularities.find((item) => item.id === d.granularity)?.name || "grain pending";
+  return `${objective} · ${grain}`;
+}
 function selectedDepartmentTypes() { return departmentTaxonomy.filter((item) => state.departmentTypes?.includes(item.id)); }
 function selectedResourceTypes() { return resourceTaxonomy.filter((item) => state.resourceTypes?.includes(item.id)); }
 function attributeProfile() {
@@ -166,6 +181,7 @@ function readiness() {
   if (state.bom?.structure && state.bom?.featuresConfirmed && state.bom?.consumption && state.bom?.source) s += 8;
   if (state.supplies?.confirmed) s += 6;
   if (state.workforce?.confirmed) s += 6;
+  if (dispatchConfigured()) s += state.dispatch?.enabled ? 6 : 2;
   if (state.execution?.source && state.execution?.levels?.length && state.execution?.events?.length && state.execution?.quantitiesConfirmed) s += 8;
   if (state.variant && state.variant !== "active") s += 6;
   if (state.migration) s -= 4;

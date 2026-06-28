@@ -545,6 +545,46 @@ function masterPlanningBoard() {
     </div>`;
 }
 
+// A small ordered dispatch list at one constraint resource, re-ranked by the
+// selected objective. Spoon-feeds what "dispatching" produces: a sequence the
+// floor runs next, with the reasons each job sits where it does.
+function dispatchBoard() {
+  const d = state.dispatch || initialState.dispatch;
+  const objective = dispatchObjectives.find((item) => item.id === d.objective)?.name || "Dispatch objective";
+  const grain = dispatchGranularities.find((item) => item.id === d.granularity)?.name || "Dispatch grain";
+  const reactivity = dispatchReactivities.find((item) => item.id === d.reactivity)?.name || "Reactivity pending";
+  const dueDate = d.objective === "due-date";
+  const setupFocus = d.objective === "changeover-min";
+  const jobs = [
+    { id: "WO-417", tag: dueDate ? "late" : "ready", note: dueDate ? "pulled up — 2 days late" : "material confirmed, on sequence" },
+    { id: "WO-402", tag: setupFocus ? "setup" : "ready", note: setupFocus ? "same changeover state — kept together" : "next in planned sequence" },
+    { id: "WO-435", tag: "ready", note: "released, awaiting the resource" },
+    { id: "WO-428", tag: "hold", note: "held — waiting on labor on shift" },
+  ];
+  return `
+    <div class="dispatch-board" role="img" aria-label="Dispatch list at a constraint resource">
+      <div class="dispatch-board-head">
+        <span><i data-lucide="list-ordered"></i>${escapeHtml(objective)}</span>
+        <strong>${escapeHtml(grain)}</strong>
+        <em>${escapeHtml(reactivity)}</em>
+      </div>
+      <ol class="dispatch-queue">
+        ${jobs.map((job, index) => `
+          <li class="dispatch-job ${job.tag}">
+            <span class="rank">${index + 1}</span>
+            <strong>${job.id}</strong>
+            <em>${escapeHtml(job.note)}</em>
+            <i class="badge">${job.tag}</i>
+          </li>`).join("")}
+      </ol>
+      <div class="dispatch-legend">
+        <span><i class="late"></i>Late / pulled up</span>
+        <span><i class="setup"></i>Setup-protected</span>
+        <span><i class="hold"></i>Held</span>
+      </div>
+    </div>`;
+}
+
 const steps = [
   {
     id: "welcome", phase: "Start", nav: "Welcome", cta: "Begin setup",
@@ -1500,7 +1540,122 @@ const steps = [
     `,
   },
   {
-    id: "execution", phase: "Model", nav: "Execution feedback",
+    id: "dispatch-purpose", phase: "Dispatch & Execute", nav: "Dispatch intent",
+    title: "How should APS/DS hand work down to the floor?",
+    sub: "Between the detailed schedule and the shop floor sits a dispatching layer. It decides what each resource runs next and how tightly the floor follows the plan.",
+    hint: "Choose whether a dispatching layer is in scope. If it is, set its objective, grain, and inputs.",
+    gate: () => !state.dispatch?.enabled ? !!state.dispatch?.reviewed : !!(state.dispatch.objective && state.dispatch.granularity && state.dispatch.inputs?.length),
+    body: () => {
+      const d = state.dispatch || initialState.dispatch;
+      const multi = (items, selected, attr) => items.map((item) => choiceTile(item.id, selected.includes(item.id), item.icon, item.name, item.note).replace("data-choice", attr)).join("");
+      return `
+        <div class="master-toggle">
+          <button type="button" class="${d.enabled ? "active" : ""}" data-dispatch-enabled="true" aria-pressed="${d.enabled}"><i data-lucide="list-ordered"></i><span><strong>Dispatching layer in scope</strong><small>Control how the schedule reaches the floor</small></span></button>
+          <button type="button" class="${!d.enabled && d.reviewed ? "active" : ""}" data-dispatch-enabled="false" aria-pressed="${!d.enabled && d.reviewed}"><i data-lucide="circle-slash-2"></i><span><strong>Release directly</strong><small>APS/DS or MES releases work without a separate layer</small></span></button>
+        </div>
+        ${d.enabled ? `
+          <div class="master-profile">
+            <section class="bom-dimension">
+              <h3>Dispatch objective</h3>
+              <div class="choice-grid three compact" data-dispatch-single="objective">
+                ${dispatchObjectives.map((item) => choiceTile(item.id, d.objective === item.id, item.icon, item.name, item.note)).join("")}
+              </div>
+            </section>
+            <section class="bom-dimension">
+              <h3>Dispatch grain</h3>
+              <div class="choice-grid two compact" data-dispatch-single="granularity">
+                ${dispatchGranularities.map((item) => choiceTile(item.id, d.granularity === item.id, item.icon, item.name, item.note)).join("")}
+              </div>
+            </section>
+            <section class="bom-dimension">
+              <h3>Inputs from APS/DS and the floor</h3>
+              <div class="choice-grid three compact">
+                ${multi(dispatchInputs, d.inputs, "data-dispatch-input")}
+              </div>
+            </section>
+          </div>` : `<p class="representative-note"><i data-lucide="info"></i> No separate dispatching layer. APS/DS (or MES) releases firmed orders straight to the floor in planned sequence.</p>`}
+      `;
+    },
+    attach: (root) => {
+      root.querySelectorAll("[data-dispatch-enabled]").forEach((button) => button.addEventListener("click", () => {
+        state.dispatch.enabled = button.dataset.dispatchEnabled === "true";
+        state.dispatch.reviewed = !state.dispatch.enabled;
+        render();
+      }));
+      root.querySelectorAll("[data-dispatch-single]").forEach((group) => group.querySelectorAll("[data-choice]").forEach((button) => button.addEventListener("click", () => {
+        state.dispatch[group.dataset.dispatchSingle] = button.dataset.choice;
+        state.dispatch.reviewed = false;
+        render();
+      })));
+      root.querySelectorAll("[data-dispatch-input]").forEach((button) => button.addEventListener("click", () => {
+        state.dispatch.inputs = toggle(state.dispatch.inputs, button.dataset.dispatchInput);
+        state.dispatch.reviewed = false;
+        render();
+      }));
+    },
+  },
+  {
+    id: "dispatch-control", phase: "Dispatch & Execute", nav: "Dispatch rules",
+    title: "What governs the dispatch list?",
+    sub: "These rules decide how work is released, re-ranked, and delivered to operators — and how fast dispatch reacts when the floor deviates from plan.",
+    hint: "Select dispatch policies, delivery channels, reactivity, then confirm the layer.",
+    gate: () => !state.dispatch?.enabled || !!(state.dispatch.policies?.length && state.dispatch.channels?.length && state.dispatch.reactivity && state.dispatch.reviewed),
+    body: () => {
+      const d = state.dispatch || initialState.dispatch;
+      if (!d.enabled) return `<div class="master-skip"><i data-lucide="circle-slash-2"></i><strong>No separate dispatching layer.</strong><p>Continue to the execution feedback contract.</p></div>`;
+      const multi = (items, selected, attr) => items.map((item) => choiceTile(item.id, selected.includes(item.id), item.icon, item.name, item.note).replace("data-choice", attr)).join("");
+      return `
+        ${dispatchBoard()}
+        <div class="master-profile">
+          <section class="bom-dimension">
+            <h3>Dispatch policies</h3>
+            <div class="choice-grid three compact">
+              ${multi(dispatchPolicies, d.policies, "data-dispatch-policy")}
+            </div>
+          </section>
+          <section class="bom-dimension">
+            <h3>Delivery channels</h3>
+            <div class="choice-grid three compact">
+              ${multi(dispatchChannels, d.channels, "data-dispatch-channel")}
+            </div>
+          </section>
+          <section class="bom-dimension">
+            <h3>Reactivity to disruption</h3>
+            <div class="choice-grid three compact" data-dispatch-single="reactivity">
+              ${dispatchReactivities.map((item) => choiceTile(item.id, d.reactivity === item.id, item.icon, item.name, item.note)).join("")}
+            </div>
+          </section>
+        </div>
+        <div class="volume-confirmation">
+          <div><i data-lucide="info"></i><p><strong>Dispatching sequences, it does not replan.</strong> APS/DS still owns finite timing and feasibility; execution feedback (next) closes the loop back to planning.</p></div>
+          <button type="button" class="${d.reviewed ? "active" : ""}" id="confirmDispatch" ${d.policies.length && d.channels.length && d.reactivity ? "" : "disabled"}><i data-lucide="${d.reviewed ? "circle-check" : "shield-check"}"></i><span>${d.reviewed ? "Dispatching layer confirmed" : "Confirm dispatching layer"}</span></button>
+        </div>
+      `;
+    },
+    attach: (root) => {
+      root.querySelectorAll("[data-dispatch-policy]").forEach((button) => button.addEventListener("click", () => {
+        state.dispatch.policies = toggle(state.dispatch.policies, button.dataset.dispatchPolicy);
+        state.dispatch.reviewed = false;
+        render();
+      }));
+      root.querySelectorAll("[data-dispatch-channel]").forEach((button) => button.addEventListener("click", () => {
+        state.dispatch.channels = toggle(state.dispatch.channels, button.dataset.dispatchChannel);
+        state.dispatch.reviewed = false;
+        render();
+      }));
+      root.querySelectorAll("[data-dispatch-single]").forEach((group) => group.querySelectorAll("[data-choice]").forEach((button) => button.addEventListener("click", () => {
+        state.dispatch[group.dataset.dispatchSingle] = button.dataset.choice;
+        state.dispatch.reviewed = false;
+        render();
+      })));
+      root.querySelector("#confirmDispatch")?.addEventListener("click", () => {
+        state.dispatch.reviewed = true;
+        render();
+      });
+    },
+  },
+  {
+    id: "execution", phase: "Dispatch & Execute", nav: "Execution feedback",
     title: "How does actual execution return to planning?",
     sub: () => `Configure the feedback contract separately from the ${profile().route.toLowerCase()}. MES events and ${profile().badge} confirmations may describe the same work at different levels and times.`,
     hint: "Complete the source, reporting level, event, and quantity configuration.",

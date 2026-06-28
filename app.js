@@ -182,6 +182,16 @@ function exportBrief() {
       terminology: calendarProfile(),
       profile: state.calendar,
     },
+    dispatching: {
+      ...state.dispatch,
+      summary: dispatchSummary(),
+      objective: dispatchObjectives.find((item) => item.id === state.dispatch?.objective) || null,
+      granularity: dispatchGranularities.find((item) => item.id === state.dispatch?.granularity) || null,
+      inputs: dispatchInputs.filter((item) => state.dispatch?.inputs?.includes(item.id)),
+      policies: dispatchPolicies.filter((item) => state.dispatch?.policies?.includes(item.id)),
+      channels: dispatchChannels.filter((item) => state.dispatch?.channels?.includes(item.id)),
+      reactivity: dispatchReactivities.find((item) => item.id === state.dispatch?.reactivity) || null,
+    },
     executionFeedback: {
       sourceLabel: executionSourceLabel(),
       ...state.execution,
