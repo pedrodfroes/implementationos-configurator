@@ -665,17 +665,33 @@ const steps = [
     sub: "Select the capability layers this project must cover. Detailed scheduling is one lane, not the whole product: Master Planning, Dispatching, execution feedback, data foundation, and architecture can all be in scope.",
     hint: "Select at least one capability lane to continue.",
     gate: () => state.scope === "aps-ds" || state.masterPlanning?.enabled || state.dispatch?.enabled,
-    body: () => `
+    body: () => {
+      const selectedCapabilities = [
+        state.masterPlanning?.enabled ? { icon: "layers-3", label: "03 Master Planning" } : null,
+        state.scope === "aps-ds" ? { icon: "calendar-clock", label: "Detailed Planning & Scheduling" } : null,
+        state.dispatch?.enabled ? { icon: "list-ordered", label: "Dispatching & execution" } : null,
+      ].filter(Boolean);
+      return `
+      <div class="scope-selection-strip${selectedCapabilities.length ? " has-selection" : ""}">
+        <div><span>Selected capability stack</span><strong>${selectedCapabilities.length ? selectedCapabilities.length + " selected" : "Nothing selected yet"}</strong></div>
+        <div class="scope-selection-chips">
+          ${selectedCapabilities.length
+            ? selectedCapabilities.map((item) => `<span><i data-lucide="${item.icon}"></i>${escapeHtml(item.label)}</span>`).join("")
+            : `<em>Choose at least one available capability card below.</em>`}
+        </div>
+      </div>
       <div class="scope-grid">
         ${planningLevels.map((item, index) => {
           const optional = item.id === "master" || item.id === "dispatch";
           const toggled = (item.id === "master" && state.masterPlanning?.enabled) || (item.id === "dispatch" && state.dispatch?.enabled);
+          const selected = state.scope === item.id || toggled;
           const label = item.id === "master" ? "03 Master Planning" : item.id === "dispatch" ? "Dispatching & execution" : item.level;
           const dataAttr = item.id === "master" ? `data-master-toggle="true"` : item.id === "dispatch" ? `data-dispatch-toggle="true"` : item.available ? `data-scope="${item.id}"` : "disabled";
           const tooltip = item.id === "master" ? "Optional upstream lane for period-level planning" : item.id === "dispatch" ? "Optional downstream lane for shop-floor dispatch and execution" : item.available ? "Available in this demo" : "Visible for context; not active in this demo yet";
-          const icon = optional ? (toggled ? "circle-check" : "plus") : item.available ? "arrow-right" : "lock-keyhole";
+          const status = selected ? "Selected" : item.available || optional ? "Available" : "Unavailable";
+          const statusIcon = selected ? "check" : item.available || optional ? "plus" : "lock-keyhole";
           return `
-          <button class="scope-card${item.available || optional ? " available" : " inactive"}${state.scope === item.id || toggled ? " active" : ""}${optional ? " optional" : ""}" type="button"
+          <button class="scope-card${item.available || optional ? " available" : " inactive"}${selected ? " active" : ""}${optional ? " optional" : ""}" type="button"
             ${dataAttr}
             title="${tooltip}">
             <span class="scope-index">${String(index + 1).padStart(2, "0")}</span>
@@ -683,13 +699,15 @@ const steps = [
               <span class="scope-topline"><strong>${escapeHtml(label)}</strong><em>${escapeHtml(item.horizon)}</em></span>
               <span class="scope-question">${escapeHtml(item.question)}</span>
               <small>${escapeHtml(item.terms)}</small>
+              <span class="scope-status ${selected ? "selected" : item.available || optional ? "available" : "unavailable"}"><i data-lucide="${statusIcon}"></i>${status}</span>
             </span>
-            <i data-lucide="${icon}"></i>
+            <span class="scope-marker" aria-hidden="true"><i data-lucide="${statusIcon}"></i></span>
           </button>`;
         }).join("")}
       </div>
       <p class="representative-note"><i data-lucide="layers-3"></i> Selected capability stack: ${capabilityStackLabel()}. You can change this later.</p>
-    `,
+    `;
+    },
     attach: (root) => {
       root.querySelectorAll("[data-scope]").forEach((button) => button.addEventListener("click", (event) => {
         state.scope = event.currentTarget.dataset.scope;
