@@ -653,16 +653,16 @@ const steps = [
         <i data-lucide="route"></i>
       </div>
       <ul class="welcome-list">
-        <li><i data-lucide="target"></i><span>Start with the business capability, then narrow industry context and operating patterns.</span></li>
+        <li><i data-lucide="target"></i><span>Start with intent and system landscape, then narrow industry context and operating patterns.</span></li>
         <li><i data-lucide="git-branch"></i><span>Try changes on a branch before committing them.</span></li>
         <li><i data-lucide="gauge"></i><span>Watch readiness build as you make each decision.</span></li>
       </ul>
     `,
   },
   {
-    id: "scope", phase: "Scope", nav: "Capability scope",
-    title: "Which manufacturing capabilities are in scope?",
-    sub: "Select the implementation layers this project must cover. Detailed scheduling is one lane, not the whole product: Master Planning, Dispatching, execution feedback, data foundation, and architecture can all be in scope.",
+    id: "scope", phase: "Intent", nav: "Implementation intent",
+    title: "What kind of implementation are we configuring?",
+    sub: "Select the capability layers this project must cover. Detailed scheduling is one lane, not the whole product: Master Planning, Dispatching, execution feedback, data foundation, and architecture can all be in scope.",
     hint: "Select at least one capability lane to continue.",
     gate: () => state.scope === "aps-ds" || state.masterPlanning?.enabled || state.dispatch?.enabled,
     body: () => `
@@ -708,7 +708,7 @@ const steps = [
     },
   },
   {
-    id: "master-purpose", phase: "03 Master Plan", nav: "Purpose & inputs",
+    id: "master-purpose", phase: "Plan", nav: "Master purpose",
     title: "Should Master Planning be part of the implementation?",
     sub: "Use this when the project must create or validate a period-level supply plan before orders move into detailed planning, scheduling, or execution.",
     hint: "Choose whether Master Planning is in scope. If it is, set purpose, grain, demand, and supply inputs.",
@@ -774,7 +774,7 @@ const steps = [
     },
   },
   {
-    id: "master-policy", phase: "03 Master Plan", nav: "Policies & buckets",
+    id: "master-policy", phase: "Plan", nav: "Master policies",
     title: "What makes the master plan feasible?",
     sub: "This layer should not schedule every operation. It decides which period-level policies and rough-cut buckets can constrain supply before the next planning or execution layer takes over.",
     hint: "Select policies, rough-cut buckets, and run behavior.",
@@ -825,7 +825,7 @@ const steps = [
     },
   },
   {
-    id: "master-handoff", phase: "03 Master Plan", nav: "Layer handoff",
+    id: "master-handoff", phase: "Plan", nav: "Master handoff",
     title: "What should Master Planning hand downstream?",
     sub: "The handoff should be precise enough for downstream planning, while leaving exact timing, sequence, and resource assignment to the right layer.",
     hint: "Select at least one handoff output and confirm the Master Planning layer.",
@@ -1044,9 +1044,9 @@ const steps = [
     attach: (root) => bindChoices(root, (v) => { state.migration = v === "yes"; render(); }),
   },
   {
-    id: "architecture", phase: "Architecture", nav: "System topology",
-    title: "Map the system architecture.",
-    sub: "The connections layer as a live diagram: where planning sits between the ERP source and shop-floor execution. Click a node to configure it, then confirm. This diagram becomes the architecture page of the blueprint.",
+    id: "architecture", phase: "Landscape", nav: "System landscape",
+    title: "Which systems participate in this implementation?",
+    sub: "Translate the implementation intent into a live landscape: ERP source, planning layer, execution layer, shop-floor signals, and any satellite systems. Click a node to configure it, then confirm.",
     hint: "Confirm every system node to continue.",
     gate: () => architectureConfigured(),
     body: () => archCanvasMarkup(),
@@ -2055,11 +2055,24 @@ const steps = [
   },
 ];
 
-// Industry constrains valid operating patterns, so it must precede Archetype.
-const industryStepIndex = steps.findIndex((step) => step.id === "industry");
-const archetypeStepIndex = steps.findIndex((step) => step.id === "archetype");
-const [industryStep] = steps.splice(industryStepIndex, 1);
-steps.splice(archetypeStepIndex, 0, industryStep);
+// The opening sequence should move from intent to landscape to business context,
+// then into deeper configuration. This keeps scope and topology adjacent without
+// asking for Master Planning details before the industry/archetype lens exists.
+const earlyJourneyOrder = [
+  "welcome",
+  "scope",
+  "architecture",
+  "industry",
+  "archetype",
+  "dialect",
+  "migration",
+  "master-purpose",
+  "master-policy",
+  "master-handoff",
+];
+const orderedEarlySteps = earlyJourneyOrder.map((id) => steps.find((step) => step.id === id)).filter(Boolean);
+const remainingSteps = steps.filter((step) => !earlyJourneyOrder.includes(step.id));
+steps.splice(0, steps.length, ...orderedEarlySteps, ...remainingSteps);
 
 //  Step UI helpers 
 function toggle(arr, value) {
