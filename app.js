@@ -90,6 +90,12 @@ function renderBlueprint() {
       </div>`
     )
     .join("");
+  const notes = state.notes || [];
+  const notesBlock = notes.length
+    ? `<div class="bp-notes"><div class="bp-notes-head"><i data-lucide="sticky-note"></i>Notes (${notes.length})</div>${notes
+        .map((n) => `<div class="bp-note"><span class="bp-note-scope">${escapeHtml(n.scopeLabel || "")}</span><p>${escapeHtml(n.text)}</p></div>`)
+        .join("")}</div>`
+    : "";
   panel.innerHTML = `
     <div class="bp-head">
       <div><p class="bp-eyebrow">Deployment blueprint</p><strong>Writes itself as you decide</strong></div>
@@ -98,12 +104,53 @@ function renderBlueprint() {
     <div class="bp-doc">
       <div class="bp-doc-top"><span class="bp-doc-title">Implementation blueprint</span><span class="bp-ver">v0.${bp.confirmed} draft</span></div>
       ${bp.sections.length ? sections : `<p class="bp-empty">The blueprint fills in here as you make decisions — confirmed sections settle in green, drafts stay flagged until the SME signs off.</p>`}
+      ${notesBlock}
       <div class="bp-foot">
-        <span><b class="bp-c">${bp.confirmed} confirmed</b> · <b class="bp-d">${bp.draft} draft</b></span>
+        <span><b class="bp-c">${bp.confirmed} confirmed</b> · <b class="bp-d">${bp.draft} draft</b>${notes.length ? ` · ${notes.length} note${notes.length === 1 ? "" : "s"}` : ""}</span>
         <button type="button" class="bp-export" id="bpExport">Export ↗</button>
       </div>
     </div>`;
   panel.querySelector("#bpExport")?.addEventListener("click", exportBrief);
+}
+
+function currentScope() {
+  const step = steps[state.i];
+  return { id: step.id, label: typeof step.nav === "function" ? step.nav() : step.nav };
+}
+
+// Soft documentation: a notes strip appended to the end of every step's
+// scroll area (so it never pushes the footer CTA), scoped to that step and
+// surfaced live in the blueprint (direction E — notes attach anywhere).
+function renderNotes() {
+  const body = $("#stageBody");
+  if (!body) return;
+  const { id, label } = currentScope();
+  const mine = (state.notes || []).filter((n) => n.scope === id);
+  const wrap = document.createElement("div");
+  wrap.className = "notes-strip";
+  wrap.innerHTML = `
+    <div class="notes-head"><i data-lucide="sticky-note"></i><span>Notes — soft documentation</span>${mine.length ? `<em>${mine.length}</em>` : ""}</div>
+    ${mine.length ? `<div class="notes-list">${mine
+      .map((n) => `<div class="note-card"><p>${escapeHtml(n.text)}</p><button class="note-del" type="button" data-note-del="${n.id}" title="Remove note">×</button></div>`)
+      .join("")}</div>` : ""}
+    <div class="notes-add">
+      <input type="text" id="noteInput" placeholder="Capture a rationale, open question, or SME comment for ${escapeHtml(label)}…" />
+      <button type="button" class="ghost-btn" id="noteAdd">Add note</button>
+    </div>`;
+  body.appendChild(wrap);
+  const input = wrap.querySelector("#noteInput");
+  const add = () => {
+    const text = input.value.trim();
+    if (!text) return;
+    state.notes = state.notes || [];
+    state.notes.push({ id: "note-" + Math.random().toString(36).slice(2, 8), scope: id, scopeLabel: label, text });
+    render();
+  };
+  wrap.querySelector("#noteAdd").addEventListener("click", add);
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); add(); } });
+  wrap.querySelectorAll("[data-note-del]").forEach((b) =>
+    b.addEventListener("click", () => { state.notes = (state.notes || []).filter((n) => n.id !== b.dataset.noteDel); render(); })
+  );
 }
 
 function applyChrome() {
@@ -191,6 +238,7 @@ function render() {
   const hint = typeof step.hint === "function" ? step.hint() : step.hint;
   $("#footHint").textContent = ok ? "" : hint || "";
 
+  renderNotes();
   renderBlueprint();
   applyChrome();
   refreshIcons();
@@ -293,7 +341,12 @@ function exportBrief() {
       sourceLabel: executionSourceLabel(),
       ...state.execution,
     },
+    systemArchitecture: {
+      confirmed: architectureConfigured(),
+      nodes: (state.architecture?.nodes || []).map(({ id, layer, name, status }) => ({ id, layer, name, status })),
+    },
     decisions: { variant: state.variant, migration: state.migration },
+    notes: (state.notes || []).map(({ scopeLabel, text }) => ({ scope: scopeLabel, text })),
     readiness: `${readiness()}%`,
     governedDecisions: Model.nodesOfType("decision").map((d) => d.props),
   };

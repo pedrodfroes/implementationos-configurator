@@ -4116,6 +4116,117 @@ body.genesis-open {
   .arch-wrap { grid-template-columns: minmax(0, 1fr); }
 }
 
+/* Soft-documentation notes (direction E) — per-step strip + blueprint echo. */
+.notes-strip {
+  margin: 20px auto 4px;
+  max-width: 940px;
+  width: 100%;
+  border-top: 1px dashed var(--line-strong);
+  padding-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.notes-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.notes-head i { width: 14px; height: 14px; color: var(--teal); }
+.notes-head em { font-style: normal; color: var(--teal); font-weight: 850; }
+
+.notes-list { display: flex; flex-direction: column; gap: 8px; }
+
+.note-card {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  justify-content: space-between;
+  background: #f6f9fc;
+  border: 1px solid #cfe0ee;
+  border-left: 3px solid var(--teal);
+  border-radius: 7px;
+  padding: 9px 11px;
+}
+
+.note-card p { margin: 0; font-size: 0.8rem; color: var(--ink); line-height: 1.4; }
+
+.note-del {
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  flex: 0 0 auto;
+}
+
+.note-del:hover { color: var(--coral); }
+
+.notes-add { display: flex; gap: 8px; }
+
+.notes-add input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  padding: 8px 11px;
+  font-size: 0.82rem;
+  color: var(--ink);
+  background: #fff;
+}
+
+.notes-add input:focus { outline: none; border-color: var(--teal); }
+
+.bp-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 9px;
+  margin-top: 2px;
+  border-top: 1px dashed var(--line);
+}
+
+.bp-notes-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.6rem;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--teal);
+}
+
+.bp-notes-head i { width: 11px; height: 11px; }
+
+.bp-note {
+  background: #f6f9fc;
+  border: 1px solid #d3e3f0;
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.bp-note-scope {
+  display: block;
+  font-size: 0.53rem;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #4a6b8a;
+  margin-bottom: 2px;
+}
+
+.bp-note p { margin: 0; font-size: 0.66rem; color: var(--ink); line-height: 1.35; }
+
 .rail {
   background: #0e1117;
   color: #eaf0f2;
