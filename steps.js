@@ -646,8 +646,8 @@ function archInspector(n) {
 const steps = [
   {
     id: "welcome", phase: "Start", nav: "Welcome", cta: "Begin setup",
-    title: "Let's configure your manufacturing planning stack.",
-    sub: "A guided build of the implementation model across planning, scheduling, dispatch, data, and execution feedback. Nothing is final; you can go back at any point.",
+    title: "Let's configure your Digital Manufacturing stack.",
+    sub: "A guided build of the implementation model across planning, scheduling, dispatch, data, and execution feedback — from APS down to MES. Nothing is final; you can go back at any point.",
     body: () => `
       <div class="welcome-art" aria-hidden="true">
         <i data-lucide="route"></i>

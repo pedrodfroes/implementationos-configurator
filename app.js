@@ -256,7 +256,7 @@ function advance() {
 
 function exportBrief() {
   const brief = {
-    product: "ImplementationOS for Manufacturing Planning and Execution",
+    product: "ImplementationOS for the Digital Manufacturing Stack",
     planningObjective: planningLevels.find((item) => item.id === state.scope) || null,
     masterPlanning: {
       ...state.masterPlanning,
