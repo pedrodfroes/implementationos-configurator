@@ -15,6 +15,8 @@ function refreshIcons() {
   if (window.lucide) window.lucide.createIcons();
 }
 
+let tutorialAudio = null;
+
 function refreshGate() {
   const step = steps[state.i];
   $("#nextBtn").disabled = step.gate ? !step.gate() : false;
@@ -159,6 +161,13 @@ function applyChrome() {
     const inHub = state.view === "cockpit" && !state.done;
     btn.innerHTML = `<i data-lucide="${inHub ? "play" : "layout-grid"}"></i><span>${inHub ? "Resume" : "Cockpit"}</span>`;
   }
+  const tutorial = $("#tutorialToggle");
+  if (tutorial) {
+    const active = !!state.tutorial?.active;
+    tutorial.classList.toggle("active", active);
+    tutorial.setAttribute("aria-pressed", String(active));
+    tutorial.innerHTML = `<i data-lucide="${active ? "x" : "sparkles"}"></i><span>${active ? "Close tutorial" : "Tutorial"}</span>`;
+  }
 }
 
 function renderCockpit() {
@@ -210,7 +219,7 @@ function renderCockpit() {
 
 function render() {
   if (state.done) { renderRail(); renderCompletion(); renderBlueprint(); applyChrome(); refreshIcons(); save(); return; }
-  if (state.view === "cockpit") { renderRail(); renderCockpit(); renderBlueprint(); applyChrome(); refreshIcons(); save(); return; }
+  if (state.view === "cockpit") { renderRail(); renderCockpit(); renderBlueprint(); applyChrome(); renderTutorial(); refreshIcons(); save(); return; }
   $("#stageFoot").style.display = "";
   const step = steps[state.i];
   renderRail();
@@ -241,6 +250,7 @@ function render() {
   renderNotes();
   renderBlueprint();
   applyChrome();
+  renderTutorial();
   refreshIcons();
   save();
 }
@@ -359,6 +369,128 @@ function exportBrief() {
   URL.revokeObjectURL(url);
 }
 
+function tutorialStep() {
+  const list = window.tutorialScript || [];
+  const index = Math.min(Math.max(Number(state.tutorial?.index || 0), 0), Math.max(list.length - 1, 0));
+  return list[index] || null;
+}
+
+function tutorialIndexForStep(stepId) {
+  const list = window.tutorialScript || [];
+  const idx = list.findIndex((item) => item.stepId === stepId);
+  return idx >= 0 ? idx : 0;
+}
+
+function startTutorial(index = null) {
+  const current = steps[state.i]?.id;
+  state.tutorial = { active: true, index: index ?? tutorialIndexForStep(current), audio: false };
+  state.view = "flow";
+  goToTutorialStep();
+}
+
+function stopTutorial() {
+  if (tutorialAudio) { tutorialAudio.pause(); tutorialAudio = null; }
+  state.tutorial = { active: false, index: 0, audio: false };
+  document.querySelector(".tutorial-layer")?.remove();
+  render();
+}
+
+function goToTutorialStep() {
+  const item = tutorialStep();
+  if (!item) { stopTutorial(); return; }
+  const idx = steps.findIndex((step) => step.id === item.stepId);
+  if (idx >= 0) {
+    state.i = idx;
+    state.max = Math.max(state.max, idx);
+    state.done = false;
+    state.view = "flow";
+  }
+  render();
+}
+
+function playTutorialAudio(item) {
+  if (tutorialAudio) { tutorialAudio.pause(); tutorialAudio = null; }
+  if (!state.tutorial?.audio || !item?.audio) return;
+  tutorialAudio = new Audio(item.audio);
+  tutorialAudio.addEventListener("ended", () => advanceTutorial(1, true));
+  tutorialAudio.play().catch(() => {
+    state.tutorial.audio = false;
+    renderTutorial();
+  });
+}
+
+function moveTutorialSpotlight(item) {
+  const layer = document.querySelector(".tutorial-layer");
+  const spot = layer?.querySelector(".tutorial-spotlight");
+  if (!layer || !spot || !item) return;
+  const target = document.querySelector(item.focus) || $("#stageBody");
+  const rect = target?.getBoundingClientRect();
+  if (!rect) return;
+  const pad = 10;
+  spot.style.setProperty("--x", `${Math.max(0, rect.left - pad)}px`);
+  spot.style.setProperty("--y", `${Math.max(0, rect.top - pad)}px`);
+  spot.style.setProperty("--w", `${Math.min(window.innerWidth, rect.width + pad * 2)}px`);
+  spot.style.setProperty("--h", `${Math.min(window.innerHeight, rect.height + pad * 2)}px`);
+}
+
+function advanceTutorial(delta, fromAudio = false) {
+  const list = window.tutorialScript || [];
+  const next = Number(state.tutorial?.index || 0) + delta;
+  if (next < 0 || next >= list.length) { stopTutorial(); return; }
+  state.tutorial.index = next;
+  if (!fromAudio && tutorialAudio) { tutorialAudio.pause(); tutorialAudio = null; }
+  goToTutorialStep();
+}
+
+function renderTutorial() {
+  document.querySelector(".tutorial-layer")?.remove();
+  if (!state.tutorial?.active) return;
+  const list = window.tutorialScript || [];
+  const item = tutorialStep();
+  if (!item) return;
+  const layer = document.createElement("div");
+  layer.className = "tutorial-layer";
+  layer.innerHTML = `
+    <div class="tutorial-dim"></div>
+    <div class="tutorial-spotlight" aria-hidden="true"></div>
+    <section class="tutorial-card" role="dialog" aria-label="Guided tutorial">
+      <div class="tutorial-top">
+        <span>Guided tutorial</span>
+        <button type="button" class="tutorial-close" data-tutorial-close title="Close tutorial"><i data-lucide="x"></i></button>
+      </div>
+      <strong>${escapeHtml(item.title)}</strong>
+      <p>${escapeHtml(item.text)}</p>
+      <div class="tutorial-audio">
+        <button type="button" class="${state.tutorial.audio ? "active" : ""}" data-tutorial-audio>
+          <i data-lucide="${state.tutorial.audio ? "volume-2" : "volume-x"}"></i>
+          <span>${state.tutorial.audio ? "Voice on" : "Voice off"}</span>
+        </button>
+        <small>${item.audio ? escapeHtml(item.audio) : "No audio file assigned"}</small>
+      </div>
+      <div class="tutorial-progress"><i style="width:${((Number(state.tutorial.index) + 1) / list.length) * 100}%"></i></div>
+      <div class="tutorial-actions">
+        <button type="button" class="ghost-btn" data-tutorial-prev ${state.tutorial.index <= 0 ? "disabled" : ""}><i data-lucide="arrow-left"></i><span>Back</span></button>
+        <span>${Number(state.tutorial.index) + 1} / ${list.length}</span>
+        <button type="button" class="cta" data-tutorial-next><span>${state.tutorial.index >= list.length - 1 ? "Finish" : "Next"}</span><i data-lucide="arrow-right"></i></button>
+      </div>
+    </section>`;
+  document.body.appendChild(layer);
+  layer.querySelector("[data-tutorial-close]").addEventListener("click", stopTutorial);
+  layer.querySelector("[data-tutorial-prev]").addEventListener("click", () => advanceTutorial(-1));
+  layer.querySelector("[data-tutorial-next]").addEventListener("click", () => advanceTutorial(1));
+  layer.querySelector("[data-tutorial-audio]").addEventListener("click", () => {
+    state.tutorial.audio = !state.tutorial.audio;
+    playTutorialAudio(item);
+    renderTutorial();
+  });
+  requestAnimationFrame(() => moveTutorialSpotlight(item));
+  playTutorialAudio(item);
+}
+
+window.addEventListener("resize", () => {
+  if (state.tutorial?.active) moveTutorialSpotlight(tutorialStep());
+});
+
 document.addEventListener("DOMContentLoaded", () => {
   load();
   $("#nextBtn").addEventListener("click", advance);
@@ -372,6 +504,9 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#cockpitToggle")?.addEventListener("click", () => {
     state.view = state.view === "cockpit" ? "flow" : "cockpit";
     render();
+  });
+  $("#tutorialToggle")?.addEventListener("click", () => {
+    state.tutorial?.active ? stopTutorial() : startTutorial(0);
   });
   $("#restartBtn").addEventListener("click", () => {
     state = clone(initialState);

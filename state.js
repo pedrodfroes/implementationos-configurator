@@ -89,6 +89,7 @@ const initialState = {
   blueprintOpen: true, // live blueprint drawer visibility (UI pref, not a step)
   view: "flow", // "flow" (linear step) | "cockpit" (module hub overview)
   notes: [], // soft documentation: [{ id, scope, scopeLabel, text }] attached per step
+  tutorial: { active: false, index: 0, audio: false },
   done: false,
 };
 
