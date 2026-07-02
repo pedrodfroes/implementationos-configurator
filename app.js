@@ -1,15 +1,15 @@
-// ImplementationOS — render loop and bootstrap.
+﻿// ImplementationOS â€” render loop and bootstrap.
 //
 // Philosophy: this is an installer, not a dashboard. One decision per
 // screen, full-bleed, gated. The semantic graph (model.js) is still the
 // single source of truth underneath; every concept that used to be a
-// persistent panel — branching, readiness, the model — is surfaced here
+// persistent panel â€” branching, readiness, the model â€” is surfaced here
 // as a step or a calm review screen. Nothing is a tab.
 //
 // This file is the entry point. It owns the render cycle, navigation, the
 // JSON export, and DOM wiring. Everything it draws comes from the `steps`
 // array (steps.js) and the derived helpers (derive.js). Load order is set in
-// index.html: util → data → state → derive → steps → app.
+// index.html: util â†’ data â†’ state â†’ derive â†’ steps â†’ app.
 
 function refreshIcons() {
   if (window.lucide) window.lucide.createIcons();
@@ -70,14 +70,19 @@ function renderCompletion() {
 }
 
 function applyBlueprintLayout() {
-  $("#installer")?.classList.toggle("bp-collapsed", !state.blueprintOpen);
+  $("#installer")?.classList.toggle("bp-open", !!state.blueprintOpen);
   $("#blueprintToggle")?.setAttribute("aria-pressed", String(!!state.blueprintOpen));
+  $("#blueprintToggle")?.classList.toggle("active", !!state.blueprintOpen);
 }
 
 function renderBlueprint() {
   applyBlueprintLayout();
   const panel = $("#blueprintPanel");
   if (!panel) return;
+  if (!state.blueprintOpen) {
+    panel.innerHTML = "";
+    return;
+  }
   const bp = blueprintModel();
   const sections = bp.sections
     .map(
@@ -92,6 +97,19 @@ function renderBlueprint() {
       </div>`
     )
     .join("");
+  const evidence = (bp.sections.length ? bp.sections : [
+    { label: "Configuration model", status: "draft", detail: "Decisions appear here as the implementation is configured." },
+  ])
+    .slice(0, 6)
+    .map((sec, index) => `
+      <figure class="bp-shot ${sec.status}">
+        <div class="bp-shot-frame">
+          <i data-lucide="${sec.status === "confirmed" ? "image" : "scan"}"></i>
+          <span>Screenshot ${String(index + 1).padStart(2, "0")}</span>
+        </div>
+        <figcaption><strong>${escapeHtml(sec.label)}</strong><small>${escapeHtml(sec.detail || "Evidence slot for the generated blueprint.")}</small></figcaption>
+      </figure>`)
+    .join("");
   const notes = state.notes || [];
   const notesBlock = notes.length
     ? `<div class="bp-notes"><div class="bp-notes-head"><i data-lucide="sticky-note"></i>Notes (${notes.length})</div>${notes
@@ -99,22 +117,39 @@ function renderBlueprint() {
         .join("")}</div>`
     : "";
   panel.innerHTML = `
-    <div class="bp-head">
-      <div><p class="bp-eyebrow">Deployment blueprint</p><strong>Writes itself as you decide</strong></div>
-      <span class="bp-live"><i data-lucide="circle-dot"></i>SME · live</span>
-    </div>
-    <div class="bp-doc">
-      <div class="bp-doc-top"><span class="bp-doc-title">Implementation blueprint</span><span class="bp-ver">v0.${bp.confirmed} draft</span></div>
-      ${bp.sections.length ? sections : `<p class="bp-empty">The blueprint fills in here as you make decisions — confirmed sections settle in green, drafts stay flagged until the SME signs off.</p>`}
-      ${notesBlock}
+    <div class="bp-backdrop" data-bp-close="1"></div>
+    <div class="bp-workspace" role="dialog" aria-modal="true" aria-label="Implementation blueprint artifact">
+      <div class="bp-head">
+        <div><p class="bp-eyebrow">Generated artifact</p><strong>Implementation blueprint</strong></div>
+        <div class="bp-head-actions">
+          <span class="bp-live"><i data-lucide="circle-dot"></i>${bp.confirmed} confirmed / ${bp.draft} draft</span>
+          <button type="button" class="bp-close" data-bp-close="1" title="Close blueprint"><i data-lucide="x"></i></button>
+        </div>
+      </div>
+      <div class="bp-artifact">
+        <section class="bp-doc">
+          <div class="bp-doc-top"><span class="bp-doc-title">Written blueprint</span><span class="bp-ver">v0.${bp.confirmed} draft</span></div>
+          ${bp.sections.length ? sections : `<p class="bp-empty">The blueprint fills in here as you make decisions. Confirmed sections settle in green; drafts stay flagged until the SME signs off.</p>`}
+          ${notesBlock}
+        </section>
+        <section class="bp-evidence" aria-label="Blueprint screenshots and visual evidence">
+          <div class="bp-doc-top"><span class="bp-doc-title">Screenshots & evidence</span><span class="bp-ver">${Math.max(bp.sections.length, 1)} slots</span></div>
+          <div class="bp-shot-grid">${evidence}</div>
+        </section>
+      </div>
       <div class="bp-foot">
-        <span><b class="bp-c">${bp.confirmed} confirmed</b> · <b class="bp-d">${bp.draft} draft</b>${notes.length ? ` · ${notes.length} note${notes.length === 1 ? "" : "s"}` : ""}</span>
-        <button type="button" class="bp-export" id="bpExport">Export ↗</button>
+        <span><b class="bp-c">${bp.confirmed} confirmed</b> / <b class="bp-d">${bp.draft} draft</b>${notes.length ? ` / ${notes.length} note${notes.length === 1 ? "" : "s"}` : ""}</span>
+        <button type="button" class="bp-export" id="bpExport">Export JSON</button>
       </div>
     </div>`;
   panel.querySelector("#bpExport")?.addEventListener("click", exportBrief);
+  panel.querySelectorAll("[data-bp-close]").forEach((el) => el.addEventListener("click", () => {
+    state.blueprintOpen = false;
+    renderBlueprint();
+    refreshIcons();
+    save();
+  }));
 }
-
 function currentScope() {
   const step = steps[state.i];
   return { id: step.id, label: typeof step.nav === "function" ? step.nav() : step.nav };
@@ -122,7 +157,7 @@ function currentScope() {
 
 // Soft documentation: a notes strip appended to the end of every step's
 // scroll area (so it never pushes the footer CTA), scoped to that step and
-// surfaced live in the blueprint (direction E — notes attach anywhere).
+// surfaced live in the blueprint (direction E â€” notes attach anywhere).
 function renderNotes() {
   const body = $("#stageBody");
   if (!body) return;
@@ -131,12 +166,12 @@ function renderNotes() {
   const wrap = document.createElement("div");
   wrap.className = "notes-strip";
   wrap.innerHTML = `
-    <div class="notes-head"><i data-lucide="sticky-note"></i><span>Notes — soft documentation</span>${mine.length ? `<em>${mine.length}</em>` : ""}</div>
+    <div class="notes-head"><i data-lucide="sticky-note"></i><span>Notes â€” soft documentation</span>${mine.length ? `<em>${mine.length}</em>` : ""}</div>
     ${mine.length ? `<div class="notes-list">${mine
-      .map((n) => `<div class="note-card"><p>${escapeHtml(n.text)}</p><button class="note-del" type="button" data-note-del="${n.id}" title="Remove note">×</button></div>`)
+      .map((n) => `<div class="note-card"><p>${escapeHtml(n.text)}</p><button class="note-del" type="button" data-note-del="${n.id}" title="Remove note">Ã—</button></div>`)
       .join("")}</div>` : ""}
     <div class="notes-add">
-      <input type="text" id="noteInput" placeholder="Capture a rationale, open question, or SME comment for ${escapeHtml(label)}…" />
+      <input type="text" id="noteInput" placeholder="Capture a rationale, open question, or SME comment for ${escapeHtml(label)}â€¦" />
       <button type="button" class="ghost-btn" id="noteAdd">Add note</button>
     </div>`;
   body.appendChild(wrap);
@@ -199,8 +234,8 @@ function renderCockpit() {
         <div class="ring" style="--p:${r}"><span>${r}<small>%</small></span></div>
         <div>
           <h2>Configuration cockpit</h2>
-          <p>Jump into any module — nothing is locked. Confirm decisions as the SME signs off; the blueprint on the right fills in live.</p>
-          <div class="cockpit-legend"><span class="done">● ${counts.done} confirmed</span><span class="active">● ${counts.active} in progress</span><span class="todo">● ${counts.todo} not started</span></div>
+          <p>Jump into any module -- nothing is locked. Confirm decisions as the SME signs off; open Blueprint when you want to inspect the generated artifact.</p>
+          <div class="cockpit-legend"><span class="done">â— ${counts.done} confirmed</span><span class="active">â— ${counts.active} in progress</span><span class="todo">â— ${counts.todo} not started</span></div>
         </div>
       </div>
       <div class="cockpit-grid">${cards}</div>
@@ -516,3 +551,4 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   render();
 });
+
