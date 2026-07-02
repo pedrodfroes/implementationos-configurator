@@ -86,7 +86,7 @@ const initialState = {
   },
   variant: null, // null | "active" | "kept" | "reverted" | "skipped"
   exportFormat: "generic", // "generic" | "opcenter"
-  blueprintOpen: true, // live blueprint drawer visibility (UI pref, not a step)
+  blueprintOpen: false, // artifact viewer visibility (UI pref, not a step)
   view: "flow", // "flow" (linear step) | "cockpit" (module hub overview)
   notes: [], // soft documentation: [{ id, scope, scopeLabel, text }] attached per step
   tutorial: { active: false, index: 0, audio: false },
@@ -105,6 +105,7 @@ function load() {
     if (raw) {
       const saved = JSON.parse(raw);
       state = { ...clone(initialState), ...saved };
+      state.blueprintOpen = false;
       if (!Array.isArray(saved.industryContexts) && saved.industry && saved.industrySpecialty) {
         state.industryContexts = [{ industry: saved.industry, specialty: saved.industrySpecialty }];
       }

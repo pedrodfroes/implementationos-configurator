@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap");
+﻿@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap");
 
 :root {
   --bg: #f4f7f8;
@@ -2784,7 +2784,7 @@ textarea {
   margin-top: 2px;
 }
 
-/* ── Archetype lens chip (top bar) ───────────────────────────────── */
+/* â”€â”€ Archetype lens chip (top bar) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .lens-chip {
   display: inline-flex;
   align-items: center;
@@ -2817,7 +2817,7 @@ textarea {
   white-space: nowrap;
 }
 
-/* ── Genesis: archetype-first cold start ─────────────────────────── */
+/* â”€â”€ Genesis: archetype-first cold start â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .genesis {
   display: none;
 }
@@ -3032,7 +3032,7 @@ body.genesis-open {
   }
 }
 
-/* ── Direction B: git spine ──────────────────────────────────────── */
+/* â”€â”€ Direction B: git spine â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .branch-switcher {
   position: relative;
 }
@@ -3514,7 +3514,7 @@ body.genesis-open {
   }
 }
 
-/* ══ Installer shell (guided setup) ═══════════════════════════════════ */
+/* â•â• Installer shell (guided setup) â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 .installer-body {
   margin: 0;
   background: #eef1f4;
@@ -3522,27 +3522,14 @@ body.genesis-open {
 
 .installer {
   display: grid;
-  grid-template-columns: 272px minmax(0, 1fr) 340px;
+  grid-template-columns: 272px minmax(0, 1fr);
   height: 100vh;
   overflow: hidden;
 }
 
-.installer.bp-collapsed {
-  grid-template-columns: 272px minmax(0, 1fr);
-}
-
-.installer.bp-collapsed .blueprint {
-  display: none;
-}
-
-/* Below this width the third column crowds the stage; hide it and let the
-   header toggle bring it back only where there's room. */
 @media (max-width: 1180px) {
   .installer {
     grid-template-columns: 272px minmax(0, 1fr);
-  }
-  .blueprint {
-    display: none;
   }
 
   .tutorial-card {
@@ -3742,15 +3729,14 @@ body.genesis-open {
 }
 
 .blueprint {
-  height: 100vh;
-  min-height: 0;
-  overflow-y: auto;
-  background: #e9edf1;
-  border-left: 1px solid var(--line);
-  padding: 20px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+  display: none;
+}
+
+.installer.bp-open .blueprint {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: block;
 }
 
 .bp-head {
@@ -3758,6 +3744,58 @@ body.genesis-open {
   align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
+}
+
+.bp-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.48);
+}
+
+.bp-workspace {
+  position: absolute;
+  inset: 28px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--teal) 26%, var(--line));
+  border-radius: 10px;
+  background: #eef1f4;
+  box-shadow: 0 30px 90px rgba(15, 23, 42, 0.34);
+}
+
+.bp-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bp-close {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  background: #ffffff;
+}
+
+.bp-close i {
+  width: 16px;
+  height: 16px;
+}
+
+.bp-artifact {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(340px, 0.95fr);
+  gap: 14px;
+  overflow: hidden;
 }
 
 .bp-eyebrow {
@@ -3771,10 +3809,10 @@ body.genesis-open {
 
 .bp-head strong {
   display: block;
-  font-size: 0.9rem;
+  font-size: 1.05rem;
   color: var(--ink);
   margin-top: 3px;
-  max-width: 170px;
+  max-width: none;
   line-height: 1.2;
 }
 
@@ -3798,7 +3836,8 @@ body.genesis-open {
 }
 
 .bp-doc {
-  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 9px;
@@ -3807,6 +3846,73 @@ body.genesis-open {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.bp-evidence {
+  min-height: 0;
+  overflow-y: auto;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
+  padding: 14px;
+}
+
+.bp-shot-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.bp-shot {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.bp-shot-frame {
+  aspect-ratio: 16 / 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  color: var(--muted);
+  background:
+    linear-gradient(135deg, rgba(13, 148, 136, 0.08), transparent),
+    repeating-linear-gradient(45deg, #f1f5f9 0 9px, #e8edf3 9px 10px);
+}
+
+.bp-shot-frame i {
+  width: 24px;
+  height: 24px;
+  color: var(--teal);
+}
+
+.bp-shot-frame span {
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.bp-shot figcaption {
+  display: grid;
+  gap: 3px;
+  padding: 9px;
+}
+
+.bp-shot figcaption strong {
+  color: var(--ink);
+  font-size: 0.72rem;
+}
+
+.bp-shot figcaption small {
+  color: var(--muted);
+  font-size: 0.65rem;
+  line-height: 1.35;
 }
 
 .bp-doc-top {
@@ -3912,7 +4018,6 @@ body.genesis-open {
 }
 
 .bp-foot {
-  margin-top: auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -3951,7 +4056,26 @@ body.genesis-open {
   border-color: var(--teal);
 }
 
-/* Cockpit — the module hub overview (direction E shell). */
+/* Cockpit â€” the module hub overview (direction E shell). */
+@media (max-width: 980px) {
+  .bp-workspace {
+    inset: 12px;
+  }
+
+  .bp-artifact {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+
+  .bp-doc,
+  .bp-evidence {
+    overflow: visible;
+  }
+
+  .bp-shot-grid {
+    grid-template-columns: 1fr;
+  }
+}
 .cockpit {
   display: flex;
   flex-direction: column;
@@ -4305,7 +4429,7 @@ body.genesis-open {
   .arch-wrap { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* Soft-documentation notes (direction E) — per-step strip + blueprint echo. */
+/* Soft-documentation notes (direction E) â€” per-step strip + blueprint echo. */
 .notes-strip {
   margin: 20px auto 4px;
   max-width: 940px;
@@ -5178,7 +5302,7 @@ body.genesis-open {
   background: var(--amber);
 }
 
-/* Dispatch list board — downstream counterpart to the master-board. */
+/* Dispatch list board â€” downstream counterpart to the master-board. */
 .dispatch-board {
   margin-bottom: 14px;
   padding: 14px;
@@ -6240,7 +6364,7 @@ body.genesis-open {
   margin-top: 1px;
 }
 
-/* Capacity Gantt — the two calendar visualization steps. */
+/* Capacity Gantt â€” the two calendar visualization steps. */
 .gantt {
   display: flex;
   flex-direction: column;
@@ -6434,7 +6558,7 @@ body.genesis-open {
 .gantt-swatch.idle { background: var(--panel-2); }
 .gantt-swatch.ccr { background: var(--amber); border-color: var(--amber); }
 
-/* Tank level charts — fill level over time, drawn as SVG. */
+/* Tank level charts â€” fill level over time, drawn as SVG. */
 .tank-board {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -6606,7 +6730,7 @@ body.genesis-open {
   background-image: repeating-linear-gradient(135deg, rgba(102, 112, 132, 0.45) 0, rgba(102, 112, 132, 0.45) 2px, transparent 2px, transparent 6px);
 }
 
-/* Workforce / skill-matrix Gantt — primaries above, skilled people below. */
+/* Workforce / skill-matrix Gantt â€” primaries above, skilled people below. */
 .gantt-group {
   margin: 8px 0 0;
   font-size: 0.56rem;
@@ -8071,3 +8195,4 @@ body.genesis-open {
     grid-template-columns: 1fr;
   }
 }
+
