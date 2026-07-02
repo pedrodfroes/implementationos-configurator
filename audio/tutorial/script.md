@@ -2,26 +2,125 @@
 
 Generate each narration as an MP3 and save it beside this file using the exact filename shown.
 
-## 01-intro.mp3
-Welcome to ImplementationOS for the Digital Manufacturing stack. This is not a form dump. It is a guided configuration journey that turns implementation decisions into a living model.
+## 01-welcome.mp3
+Welcome to ImplementationOS for the Digital Manufacturing stack. This guided flow turns implementation decisions into a living configuration model, one clear screen at a time.
 
-## 02-intent.mp3
-The first real decision is intent. Pick the capability layers in scope: master planning, detailed planning and scheduling, dispatch, execution feedback, data foundation, and architecture.
+## 02-implementation-intent.mp3
+Start by choosing the capability layers in scope. The selected stack at the top summarizes the answer, while each card says whether it is selected, available, or unavailable.
 
-## 03-selected-cards.mp3
-Each card now states whether it is selected, available, or unavailable. The selected stack above the grid summarizes the answer, so you do not have to infer it from color alone.
+## 03-system-landscape.mp3
+Now translate intent into systems. Confirm the ERP source, planning layer, execution layer, shop-floor signals, and any satellite systems that shape the implementation.
 
-## 04-system-landscape.mp3
-Next, the system landscape shows how the ERP source, planning layer, execution layer, shop floor, and satellite systems participate in the implementation.
+## 04-industry-context.mp3
+Select every industry specialization the project must cover. The model supports portfolios, so one implementation can include multiple product families, sites, or business units.
 
-## 05-industry-context.mp3
-Industry context comes before operating archetype. A project can span several sectors or specializations, so the model supports portfolios rather than forcing one narrow industry label.
+## 05-archetype.mp3
+Choose the operating archetypes that truly shape the project. Incompatible cards stay visible for context, but only compatible patterns can enter the model.
 
-## 06-archetype.mp3
-Archetypes describe the operating pattern: discrete, process, packaging, asset-heavy, labor-heavy, or hybrid. Incompatible choices stay visible for context but cannot enter the model.
+## 06-dialect.mp3
+The app synthesizes industry and archetype into a planning dialect. Use this screen to confirm the ERP vocabulary the customer actually uses.
 
-## 07-blueprint.mp3
-The blueprint on the right is the implementation evidence trail. As decisions are confirmed, it becomes a handoff artifact rather than a separate document someone has to reconstruct later.
+## 07-migration.mp3
+If an S/4 or similar migration is on the roadmap, the implementation should avoid brittle one-off mappings and carry that risk into readiness.
 
-## 08-cockpit.mp3
-Use Cockpit to jump between modules, Blueprint to inspect evidence, and Tutorial to guide a stakeholder through the concept with voiceover, captions, and focus transitions.
+## 08-master-purpose.mp3
+Master Planning is optional. Use it when the project needs a period-level supply plan before detailed planning, scheduling, dispatch, or execution takes over.
+
+## 09-master-policy.mp3
+This layer should not sequence every operation. It sets rough-cut capacity, planning policies, and bucket-level feasibility before the next layer takes over.
+
+## 10-master-handoff.mp3
+Confirm what Master Planning hands downstream: firmed orders, pegging, overloads, inventory projection, or another release package.
+
+## 11-capacity-basics.mp3
+This teaching screen shows that capacity is only the time a resource is actually open. Nights, breaks, holidays, and maintenance cannot be scheduled.
+
+## 12-calendars-capacity.mp3
+Capture the availability layers, shift pattern, exceptions, and capacity modifiers. This is how the planning engine knows whether open time is really usable.
+
+## 13-capacity-preview.mp3
+Review the resulting capacity timeline. This is a simplified day view of how the chosen calendar model changes each resource's usable time.
+
+## 14-bottleneck-basics.mp3
+A bottleneck is the resource everything waits on. The app explains the concept without assuming the customer already knows where the constraint is.
+
+## 15-bottleneck.mp3
+Ask whether the customer sees a stable bottleneck, a shifting bottleneck, or no clear constraint yet. This records a hypothesis, not a forced answer.
+
+## 16-bottleneck-preview.mp3
+This preview draws the bottleneck hypothesis against the schedule. It makes clear that the planning engine can recompute the binding resource each run.
+
+## 17-department-taxonomy.mp3
+Select department taxonomies rather than asking for real plant names. The generated dataset will be representative and replaceable by customer data later.
+
+## 18-resource-taxonomy.mp3
+Pick the resource types that shape capacity: lines, work centers, tanks, people, labs, tools, or other constraints. These seed the representative model.
+
+## 19-tank-basics.mp3
+Tanks and silos are not ordinary machines or shelves. Their feasibility depends on live occupancy, flow, cleaning state, and product eligibility.
+
+## 20-volume-storage.mp3
+Use this screen when tanks, vats, silos, buffers, or drums affect feasibility. If they do not matter, mark them out of scope and move on.
+
+## 21-tank-preview.mp3
+The preview shows fill, hold, drain, heel, and capacity limits over a cycle. It makes tank scheduling visible instead of hiding it in a duration.
+
+## 22-classification.mp3
+Attributes begin with classification and grouping. These fields later drive changeovers, campaigns, reporting, and eligibility rules.
+
+## 23-descriptive.mp3
+Descriptive fields explain what the item is. The tutorial keeps them representative until real master data replaces the generated examples.
+
+## 24-planning-fields.mp3
+Planning fields tell the model how an item behaves: lead times, lot sizes, shelf life, storage rules, and other planning-relevant properties.
+
+## 25-variants.mp3
+Variants describe sellable or manufacturable differences. They may affect routing, packaging, eligibility, sequencing, or material availability.
+
+## 26-batch-serial.mp3
+Batch and serial attributes matter for traceability, potency, expiry, genealogy, and regulated execution feedback.
+
+## 27-quality-params.mp3
+Quality parameters describe what must be true about the item or process. In regulated environments, they connect planning to batch records and release evidence.
+
+## 28-transition-basics.mp3
+Between production runs, the line loses capacity to setup, changeover, cleaning, teardown, or other transitions. The model must account for that lost time.
+
+## 29-setup-cleaning.mp3
+Define what inserts transitions, whether they block the resource, and whether they are driven by SKU, family, attribute, recipe, or cleaning state.
+
+## 30-transition-preview.mp3
+This preview shows the gaps between runs. Wider gaps cost more capacity, and concurrent transitions can overlap rather than stop the resource.
+
+## 31-bom-profile.mp3
+BOMs can be multilevel, single-level, recipe-like, phantom-heavy, recursive, allocation-based, or order-level. Capture how product structure reaches planning.
+
+## 32-critical-supplies.mp3
+Not every material should hard-stop a schedule. Use lead time, storage capacity, shelf life, transfer risk, and substitutability to decide what is truly binding.
+
+## 33-workforce-basics.mp3
+Machines do not run themselves. Skilled people, qualifications, absences, and shift coverage can gate a schedule just like equipment.
+
+## 34-workforce-planning.mp3
+Choose how deeply to model workforce constraints. Some environments only need shift coverage; others need named skills, qualifications, and deployment rules.
+
+## 35-workforce-preview.mp3
+The preview shows how skilled secondary resources constrain primary machines. A job waits if the right qualified person is not available.
+
+## 36-dispatch-intent.mp3
+Dispatching decides how planned work becomes shop-floor action. Choose whether there is a separate dispatch layer or direct release through planning or MES.
+
+## 37-dispatch-rules.mp3
+Dispatch rules control sequence adherence, due-date protection, WIP, changeover preservation, and how quickly the floor reacts to disruption.
+
+## 38-execution-feedback.mp3
+Execution feedback can come from MES, ERP, or both. Capture starts, completions, partials, scrap, yields, timestamps, phases, steps, and confirmations.
+
+## 39-try-variant.mp3
+Variants let the team test a modeling decision before committing it. The branch history becomes part of the evidence trail rather than an undocumented side path.
+
+## 40-readiness.mp3
+Readiness is computed from the decisions made so far: scope, model completeness, data issues, risk, and evidence. It shows what still needs attention.
+
+## 41-handoff.mp3
+The final screen exports the configuration, decisions, representative dataset, evidence, and notes. The handoff is generated from the journey, not recreated afterward.

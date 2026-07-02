@@ -3591,8 +3591,7 @@ body.genesis-open {
 .tutorial-dim {
   position: absolute;
   inset: 0;
-  background: rgba(8, 13, 23, 0.62);
-  backdrop-filter: blur(2px);
+  background: transparent;
 }
 
 .tutorial-spotlight {
