@@ -15,8 +15,6 @@ function refreshIcons() {
   if (window.lucide) window.lucide.createIcons();
 }
 
-let tutorialAudio = null;
-
 function refreshGate() {
   const step = steps[state.i];
   $("#nextBtn").disabled = step.gate ? !step.gate() : false;
@@ -418,14 +416,13 @@ function tutorialIndexForStep(stepId) {
 
 function startTutorial(index = null) {
   const current = steps[state.i]?.id;
-  state.tutorial = { active: true, index: index ?? tutorialIndexForStep(current), audio: true, audioBlocked: false };
+  state.tutorial = { active: true, index: index ?? tutorialIndexForStep(current) };
   state.view = "flow";
   goToTutorialStep();
 }
 
 function stopTutorial() {
-  if (tutorialAudio) { tutorialAudio.pause(); tutorialAudio = null; }
-  state.tutorial = { active: false, index: 0, audio: false };
+  state.tutorial = { active: false, index: 0 };
   document.querySelector(".tutorial-layer")?.remove();
   render();
 }
@@ -441,20 +438,6 @@ function goToTutorialStep() {
     state.view = "flow";
   }
   render();
-}
-
-function playTutorialAudio(item) {
-  if (tutorialAudio) { tutorialAudio.pause(); tutorialAudio = null; }
-  if (!state.tutorial?.audio || !item?.audio) return;
-  state.tutorial.audioBlocked = false;
-  tutorialAudio = document.querySelector("[data-tutorial-player]") || new Audio(item.audio);
-  tutorialAudio.src = item.audio;
-  tutorialAudio.preload = "auto";
-  tutorialAudio.addEventListener("ended", () => advanceTutorial(1, true));
-  tutorialAudio.play().catch(() => {
-    state.tutorial.audioBlocked = true;
-    renderTutorial({ autoplay: false });
-  });
 }
 
 function moveTutorialSpotlight(item) {
@@ -476,11 +459,10 @@ function advanceTutorial(delta, fromAudio = false) {
   const next = Number(state.tutorial?.index || 0) + delta;
   if (next < 0 || next >= list.length) { stopTutorial(); return; }
   state.tutorial.index = next;
-  if (!fromAudio && tutorialAudio) { tutorialAudio.pause(); tutorialAudio = null; }
   goToTutorialStep();
 }
 
-function renderTutorial({ autoplay = true } = {}) {
+function renderTutorial() {
   document.querySelector(".tutorial-layer")?.remove();
   if (!state.tutorial?.active) return;
   const list = window.tutorialScript || [];
@@ -500,13 +482,10 @@ function renderTutorial({ autoplay = true } = {}) {
       <p>${escapeHtml(item.text)}</p>
       <div class="tutorial-audio">
         <div class="tutorial-audio-main">
-          <button type="button" class="${state.tutorial.audio ? "active" : ""}" data-tutorial-audio>
-          <i data-lucide="${state.tutorial.audio ? "volume-2" : "volume-x"}"></i>
-          <span>${state.tutorial.audio ? "Voice on" : "Voice off"}</span>
-          </button>
-          ${item.audio ? `<audio class="tutorial-player" data-tutorial-player controls preload="auto" src="${escapeHtml(item.audio)}"></audio>` : ""}
+          <span class="tutorial-audio-label"><i data-lucide="volume-2"></i>Narration</span>
+          ${item.audio ? `<audio class="tutorial-player" data-tutorial-player controls preload="metadata" src="${escapeHtml(item.audio)}"></audio>` : ""}
         </div>
-        <small>${state.tutorial.audioBlocked ? "Press play on the audio bar" : item.audio ? escapeHtml(item.audio) : "No audio file assigned"}</small>
+        <small>${item.audio ? "Captions stay visible while audio plays" : "No audio file assigned"}</small>
       </div>
       <div class="tutorial-progress"><i style="width:${((Number(state.tutorial.index) + 1) / list.length) * 100}%"></i></div>
       <div class="tutorial-actions">
@@ -519,16 +498,7 @@ function renderTutorial({ autoplay = true } = {}) {
   layer.querySelector("[data-tutorial-close]").addEventListener("click", stopTutorial);
   layer.querySelector("[data-tutorial-prev]").addEventListener("click", () => advanceTutorial(-1));
   layer.querySelector("[data-tutorial-next]").addEventListener("click", () => advanceTutorial(1));
-  layer.querySelector("[data-tutorial-audio]").addEventListener("click", () => {
-    const wantsAudio = !state.tutorial.audio;
-    state.tutorial.audio = wantsAudio;
-    state.tutorial.audioBlocked = false;
-    if (tutorialAudio) { tutorialAudio.pause(); tutorialAudio = null; }
-    renderTutorial({ autoplay: false });
-    if (wantsAudio) playTutorialAudio(item);
-  });
   requestAnimationFrame(() => moveTutorialSpotlight(item));
-  if (autoplay) playTutorialAudio(item);
 }
 
 window.addEventListener("resize", () => {

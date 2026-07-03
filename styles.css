@@ -3680,6 +3680,21 @@ body.genesis-open {
   flex: 1;
 }
 
+.tutorial-audio-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  color: var(--teal);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.tutorial-audio-label i {
+  width: 15px;
+  height: 15px;
+}
+
 .tutorial-audio button {
   display: inline-flex;
   align-items: center;
