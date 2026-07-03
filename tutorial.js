@@ -1,6 +1,6 @@
 ﻿// ImplementationOS -- scripted tutorial mode.
 //
-// Audio files are optional. Generate voiceover MP3s with the matching file
+// Audio files are optional. Generate voiceover WAVs with the matching file
 // names and place them under ./audio/tutorial/. Captions and spotlight focus
 // work even when the audio files are not present.
 

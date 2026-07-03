@@ -418,7 +418,7 @@ function tutorialIndexForStep(stepId) {
 
 function startTutorial(index = null) {
   const current = steps[state.i]?.id;
-  state.tutorial = { active: true, index: index ?? tutorialIndexForStep(current), audio: false };
+  state.tutorial = { active: true, index: index ?? tutorialIndexForStep(current), audio: true, audioBlocked: false };
   state.view = "flow";
   goToTutorialStep();
 }
@@ -446,11 +446,14 @@ function goToTutorialStep() {
 function playTutorialAudio(item) {
   if (tutorialAudio) { tutorialAudio.pause(); tutorialAudio = null; }
   if (!state.tutorial?.audio || !item?.audio) return;
-  tutorialAudio = new Audio(item.audio);
+  state.tutorial.audioBlocked = false;
+  tutorialAudio = document.querySelector("[data-tutorial-player]") || new Audio(item.audio);
+  tutorialAudio.src = item.audio;
+  tutorialAudio.preload = "auto";
   tutorialAudio.addEventListener("ended", () => advanceTutorial(1, true));
   tutorialAudio.play().catch(() => {
-    state.tutorial.audio = false;
-    renderTutorial();
+    state.tutorial.audioBlocked = true;
+    renderTutorial({ autoplay: false });
   });
 }
 
@@ -477,7 +480,7 @@ function advanceTutorial(delta, fromAudio = false) {
   goToTutorialStep();
 }
 
-function renderTutorial() {
+function renderTutorial({ autoplay = true } = {}) {
   document.querySelector(".tutorial-layer")?.remove();
   if (!state.tutorial?.active) return;
   const list = window.tutorialScript || [];
@@ -496,11 +499,14 @@ function renderTutorial() {
       <strong>${escapeHtml(item.title)}</strong>
       <p>${escapeHtml(item.text)}</p>
       <div class="tutorial-audio">
-        <button type="button" class="${state.tutorial.audio ? "active" : ""}" data-tutorial-audio>
+        <div class="tutorial-audio-main">
+          <button type="button" class="${state.tutorial.audio ? "active" : ""}" data-tutorial-audio>
           <i data-lucide="${state.tutorial.audio ? "volume-2" : "volume-x"}"></i>
           <span>${state.tutorial.audio ? "Voice on" : "Voice off"}</span>
-        </button>
-        <small>${item.audio ? escapeHtml(item.audio) : "No audio file assigned"}</small>
+          </button>
+          ${item.audio ? `<audio class="tutorial-player" data-tutorial-player controls preload="auto" src="${escapeHtml(item.audio)}"></audio>` : ""}
+        </div>
+        <small>${state.tutorial.audioBlocked ? "Press play on the audio bar" : item.audio ? escapeHtml(item.audio) : "No audio file assigned"}</small>
       </div>
       <div class="tutorial-progress"><i style="width:${((Number(state.tutorial.index) + 1) / list.length) * 100}%"></i></div>
       <div class="tutorial-actions">
@@ -514,12 +520,15 @@ function renderTutorial() {
   layer.querySelector("[data-tutorial-prev]").addEventListener("click", () => advanceTutorial(-1));
   layer.querySelector("[data-tutorial-next]").addEventListener("click", () => advanceTutorial(1));
   layer.querySelector("[data-tutorial-audio]").addEventListener("click", () => {
-    state.tutorial.audio = !state.tutorial.audio;
-    playTutorialAudio(item);
-    renderTutorial();
+    const wantsAudio = !state.tutorial.audio;
+    state.tutorial.audio = wantsAudio;
+    state.tutorial.audioBlocked = false;
+    if (tutorialAudio) { tutorialAudio.pause(); tutorialAudio = null; }
+    renderTutorial({ autoplay: false });
+    if (wantsAudio) playTutorialAudio(item);
   });
   requestAnimationFrame(() => moveTutorialSpotlight(item));
-  playTutorialAudio(item);
+  if (autoplay) playTutorialAudio(item);
 }
 
 window.addEventListener("resize", () => {

@@ -3672,10 +3672,19 @@ body.genesis-open {
   background: #f8fafc;
 }
 
+.tutorial-audio-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
 .tutorial-audio button {
   display: inline-flex;
   align-items: center;
   gap: 7px;
+  flex: 0 0 auto;
   min-height: 32px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -3683,6 +3692,12 @@ body.genesis-open {
   background: #ffffff;
   color: var(--ink);
   font-weight: 850;
+}
+
+.tutorial-player {
+  width: min(230px, 100%);
+  height: 32px;
+  flex: 1 1 180px;
 }
 
 .tutorial-audio button.active {
